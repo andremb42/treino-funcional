@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 
-// ─── WORKOUT DATA ───────────────────────────────────────────
+/* ═══════════ WORKOUT DATA ═══════════ */
 const WORKOUTS = {
   A: {
     name: "Treino A", subtitle: "Empurrar + Puxar + Ombro", color: "#0d9488",
@@ -45,7 +45,7 @@ const WORKOUTS = {
         { id:"b11", name:"Panturrilha em pé", sets:3, reps:"10 a 15", compound:false, desc:"Subir, segurar 1s, descer lento." },
       ]},
       { name: "Finalização", rest: "30s", exercises: [
-        { id:"b12", name:"Prancha toque ombro", sets:3, reps:"8/lado", noWeight:true, desc:"Posição de flexão, tocar ombro oposto sem rotacionar." },
+        { id:"b12", name:"Prancha c/ toque no ombro", sets:3, reps:"8/lado", noWeight:true, desc:"Posição de flexão, tocar ombro oposto sem rotacionar." },
         { id:"b13", name:"90/90 stretch quadril", sets:2, reps:"30s/lado", noWeight:true, desc:"Sentado, pernas a 90°. Rotação do quadril." },
       ]},
     ],
@@ -54,13 +54,13 @@ const WORKOUTS = {
     name: "Treino C", subtitle: "Full Body + Braços", color: "#2563eb",
     sections: [
       { name: "Ativação", rest: "30s", exercises: [
-        { id:"c1", name:"Cat-Cow", sets:2, reps:"10", noWeight:true, desc:"4 apoios, alternar arquear e estender a coluna." },
+        { id:"c1", name:"Cat-Cow", sets:2, reps:"10", noWeight:true, desc:"4 apoios. Alternar arquear e estender a coluna." },
         { id:"c2", name:"Inchworm", sets:2, reps:"6", noWeight:true, desc:"Em pé, mãos ao chão, caminhar até prancha e voltar." },
-        { id:"c3", name:"Rotação ext. ombro", sets:2, reps:"12/lado", noWeight:true, desc:"Elástico. Prepara manguito." },
+        { id:"c3", name:"Rotação ext. ombro", sets:2, reps:"12/lado", noWeight:true, desc:"Elástico, prepara manguito pro desenvolvimento." },
       ]},
       { name: "Principal", rest: "60-90s", exercises: [
         { id:"c4", name:"Stiff c/ barra", sets:3, reps:"6 a 10", compound:true, desc:"Quadril pra trás, barra perto do corpo, lombar neutra." },
-        { id:"c5", name:"Supino reto hammer", sets:3, reps:"6 a 8", compound:true, desc:"Sem cluster set. Volume de peito." },
+        { id:"c5", name:"Supino reto hammer", sets:3, reps:"6 a 8", compound:true, desc:"Sem cluster set. Volume adicional de peito." },
         { id:"c6", name:"Desenvolvimento hammer", sets:3, reps:"6 a 8", compound:true, desc:"Press ombro na máquina." },
         { id:"c7", name:"Remada unilat. halter", sets:3, reps:"8-10/lado", compound:true, desc:"Apoiar mão e joelho no banco, puxar halter." },
         { id:"c8", name:"Elevação lateral polia", sets:3, reps:"10-12/lado", compound:false, desc:"Polia baixa, mão oposta. Tensão constante." },
@@ -83,23 +83,96 @@ const EFFORT_OPTS = [
   { value:"falha", label:"Falha", hint:"Não completou", color:"#991b1b" },
 ];
 
-// ─── STORAGE ────────────────────────────────────────────────
-const SK = "treino_func_v2";
+/* Activity types */
+const ACTIVITY_TYPES = {
+  muscA: { label: "Musculação A", short: "A", color: "#0d9488", kind: "workout", workoutKey: "A" },
+  muscB: { label: "Musculação B", short: "B", color: "#059669", kind: "workout", workoutKey: "B" },
+  muscC: { label: "Musculação C", short: "C", color: "#2563eb", kind: "workout", workoutKey: "C" },
+  corrida: { label: "Corrida", short: "R", color: "#ea580c", kind: "check" },
+  yoga: { label: "Yoga", short: "Y", color: "#7c3aed", kind: "check" },
+  ativacao: { label: "Ativação", short: "A+", color: "#0891b2", kind: "check" },
+  descanso: { label: "Descanso", short: "Z", color: "#6b7280", kind: "rest" },
+};
+
+const DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const DAYS_FULL = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
+/* ═══════════ STORAGE ═══════════ */
+const SK = "treino_func_v3";
+const SCHEDULE_KEY = "treino_schedule_v1";
+const CHECKS_KEY = "treino_checks_v1";
+
 const load = () => { try { return JSON.parse(localStorage.getItem(SK)) || {}; } catch { return {}; } };
-const save = (d) => { try { localStorage.setItem(SK, JSON.stringify(d)); } catch {} };
-const getHist = (id) => (load()[id] || []).sort((a, b) => new Date(b.date) - new Date(a.date));
-const getLast = (id) => { const h = getHist(id); return h[0] || null; };
+const save = d => { try { localStorage.setItem(SK, JSON.stringify(d)); } catch {} };
+const getHist = id => (load()[id] || []).sort((a,b) => new Date(b.date) - new Date(a.date));
+const getLast = id => { const h = getHist(id); return h[0] || null; };
 const saveEntry = (id, e) => { const d = load(); if (!d[id]) d[id] = []; d[id].push({ ...e, date: new Date().toISOString() }); save(d); };
 
-function getAllWeighted() {
-  const list = [];
-  Object.values(WORKOUTS).forEach(w => w.sections.forEach(s => s.exercises.forEach(e => { if (!e.noWeight) list.push(e); })));
-  return list;
+const loadSchedule = () => {
+  try { return JSON.parse(localStorage.getItem(SCHEDULE_KEY)) || getDefaultSchedule(); }
+  catch { return getDefaultSchedule(); }
+};
+const saveSchedule = s => { try { localStorage.setItem(SCHEDULE_KEY, JSON.stringify(s)); } catch {} };
+
+const loadChecks = () => { try { return JSON.parse(localStorage.getItem(CHECKS_KEY)) || {}; } catch { return {}; } };
+const saveChecks = c => { try { localStorage.setItem(CHECKS_KEY, JSON.stringify(c)); } catch {} };
+
+function getDefaultSchedule() {
+  return {
+    0: [], // Dom
+    1: ["ativacao", "muscA"],
+    2: ["yoga"],
+    3: ["corrida", "muscB"],
+    4: ["yoga"],
+    5: ["ativacao", "muscC"],
+    6: ["corrida", "yoga"],
+  };
 }
+
+function getDateKey(date) {
+  const d = new Date(date);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+function isChecked(date, activityKey) {
+  const checks = loadChecks();
+  const key = getDateKey(date);
+  return !!(checks[key] && checks[key][activityKey]);
+}
+
+function toggleCheck(date, activityKey) {
+  const checks = loadChecks();
+  const key = getDateKey(date);
+  if (!checks[key]) checks[key] = {};
+  checks[key][activityKey] = !checks[key][activityKey];
+  if (!checks[key][activityKey]) delete checks[key][activityKey];
+  if (Object.keys(checks[key]).length === 0) delete checks[key];
+  saveChecks(checks);
+}
+
+function isWorkoutCompleted(date, workoutKey) {
+  const dateKey = getDateKey(date);
+  const data = load();
+  const start = new Date(dateKey).getTime();
+  const end = start + 86400000;
+  return Object.values(data).some(entries =>
+    entries.some(e => {
+      const t = new Date(e.date).getTime();
+      return t >= start && t < end;
+    })
+  );
+}
+
+/* ═══════════ HELPERS ═══════════ */
 function getAllExercises(k) {
   const l = [];
   WORKOUTS[k].sections.forEach(s => s.exercises.forEach(e => l.push({ ...e, section: s.name, rest: s.rest })));
   return l;
+}
+function getAllWeighted() {
+  const list = [];
+  Object.values(WORKOUTS).forEach(w => w.sections.forEach(s => s.exercises.forEach(e => { if (!e.noWeight) list.push(e); })));
+  return list;
 }
 function getSuggestion(last, compound) {
   if (!last?.weight) return null;
@@ -108,23 +181,21 @@ function getSuggestion(last, compound) {
   const r = map[last.effort] || [w, "Manter"];
   return { weight: r[0], reason: r[1] };
 }
-function getConsHeavy(id) { const h = getHist(id); let c = 0; for (const x of h) { if (x.effort === "pesado") c++; else break; } return c; }
-
-// ─── UTILS ──────────────────────────────────────────────────
+function getConsHeavy(id) {
+  const h = getHist(id); let c = 0;
+  for (const x of h) { if (x.effort === "pesado") c++; else break; }
+  return c;
+}
 function getWeekKey(date) {
   const d = new Date(date);
   const jan1 = new Date(d.getFullYear(), 0, 1);
   const days = Math.floor((d - jan1) / 86400000);
   return `${d.getFullYear()}-W${Math.ceil((days + jan1.getDay() + 1) / 7)}`;
 }
-function getWeekLabel(wk) {
-  const [y, w] = wk.split("-W");
-  return `Sem ${w}`;
-}
 function getPR(id) {
   const h = getHist(id);
   if (!h.length) return null;
-  return h.reduce((max, e) => (parseFloat(e.weight) || 0) > (parseFloat(max.weight) || 0) ? e : max, h[0]);
+  return h.reduce((m, e) => (parseFloat(e.weight)||0) > (parseFloat(m.weight)||0) ? e : m, h[0]);
 }
 function isNewPR(id, weight) {
   const pr = getPR(id);
@@ -140,118 +211,354 @@ function getStreak() {
   let streak = 0;
   for (let i = 0; i < weeks.length; i++) {
     if (i === 0 && weeks[0] !== current) {
-      const prev = getWeekKey(new Date(Date.now() - 7 * 86400000));
+      const prev = getWeekKey(new Date(Date.now() - 7*86400000));
       if (weeks[0] !== prev) break;
     }
     if (i > 0) {
-      const [y1, w1] = weeks[i-1].split("-W").map(Number);
-      const [y2, w2] = weeks[i].split("-W").map(Number);
-      if (!(y1 === y2 && w1 - w2 === 1) && !(y1 > y2 && w2 >= 50 && w1 <= 2)) break;
+      const [y1,w1] = weeks[i-1].split("-W").map(Number);
+      const [y2,w2] = weeks[i].split("-W").map(Number);
+      if (!(y1===y2 && w1-w2===1) && !(y1>y2 && w2>=50 && w1<=2)) break;
     }
     streak++;
   }
   return streak;
 }
+function getWeekDates(offset = 0) {
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1) + offset * 7);
+  monday.setHours(0, 0, 0, 0);
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    dates.push(d);
+  }
+  return dates;
+}
 
-// ─── CHART COMPONENT ────────────────────────────────────────
-function Chart({ data, label, color = "#0d9488", valueKey = "weight", formatter }) {
-  if (!data || data.length < 2) return <p style={{ fontSize: 12, color: "#9ca3af", textAlign: "center", padding: 16 }}>Dados insuficientes para gráfico</p>;
-  const vals = data.map(p => parseFloat(p[valueKey]) || 0);
-  const max = Math.max(...vals), min = Math.min(...vals), range = max - min || 1;
-  const W = 300, H = 90, pad = 10;
-  const pts = vals.map((v, i) => ({
-    x: pad + (i / (vals.length - 1)) * (W - pad * 2),
-    y: H - pad - ((v - min) / range) * (H - pad * 2),
-    v
-  }));
-  const trend = vals[vals.length - 1] - vals[0];
-  const fmt = formatter || (v => `${v}`);
+/* ═══════════ COMPONENTS ═══════════ */
+function ActivityBadge({ activityKey, size = "md" }) {
+  const act = ACTIVITY_TYPES[activityKey];
+  if (!act) return null;
+  const sizes = {
+    sm: { w: 22, h: 22, fs: 10 },
+    md: { w: 28, h: 28, fs: 11 },
+    lg: { w: 36, h: 36, fs: 13 },
+  };
+  const s = sizes[size];
   return (
-    <div style={{ margin: "12px 0" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-        <span style={{ fontSize: 12, color: "#6b7280" }}>{label}</span>
-        <span style={{ fontSize: 12, fontWeight: 500, color: trend > 0 ? "#059669" : trend < 0 ? "#dc2626" : "#6b7280" }}>
-          {trend > 0 ? "+" : ""}{trend.toFixed(1)} {valueKey === "weight" ? "kg" : ""}
-        </span>
+    <div style={{
+      width: s.w, height: s.h, borderRadius: 6, background: act.color,
+      color: "#fff", fontSize: s.fs, fontWeight: 600,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      flexShrink: 0,
+    }}>{act.short}</div>
+  );
+}
+
+/* ═══════════ TODAY SCREEN ═══════════ */
+function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHistory }) {
+  const [, forceUpdate] = useState({});
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const schedule = loadSchedule();
+  const todayActivities = schedule[dayOfWeek] || [];
+  const st = getStreak();
+
+  const handleCheck = (activityKey) => {
+    toggleCheck(today, activityKey);
+    forceUpdate({});
+  };
+
+  const completed = todayActivities.filter(ak => {
+    const act = ACTIVITY_TYPES[ak];
+    if (act.kind === "workout") return isWorkoutCompleted(today, act.workoutKey);
+    return isChecked(today, ak);
+  }).length;
+
+  return (
+    <div style={{ padding: "24px 16px", maxWidth: 420, margin: "0 auto", paddingBottom: 80 }}>
+      <div style={{ fontSize: 11, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+        {today.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 90, background: "#f9fafb", borderRadius: 8 }}>
-        <polyline fill="none" stroke={color} strokeWidth="2" points={pts.map(p => `${p.x},${p.y}`).join(" ")} />
-        {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="3" fill={color} />)}
-        <text x={pts[0].x} y={H - 1} fontSize="9" fill="#9ca3af">{fmt(vals[0])}</text>
-        <text x={pts[pts.length-1].x} y={H - 1} fontSize="9" fill="#9ca3af" textAnchor="end">{fmt(vals[vals.length-1])}</text>
-      </svg>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#9ca3af", marginTop: 2 }}>
-        <span>{data[0]?.date ? new Date(data[0].date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : ""}</span>
-        <span>{data[data.length-1]?.date ? new Date(data[data.length-1].date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : ""}</span>
+      <h1 style={{ fontSize: 24, fontWeight: 600, margin: "0 0 20px" }}>Hoje</h1>
+
+      {st > 0 && (
+        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "10px 14px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 12, color: "#166534" }}>{st} {st===1?"semana":"semanas"} consecutivas</span>
+          <span style={{ fontSize: 16 }}>{"🔥".repeat(Math.min(st, 5))}</span>
+        </div>
+      )}
+
+      {todayActivities.length === 0 ? (
+        <div style={{ background: "#f9fafb", borderRadius: 12, padding: 24, textAlign: "center", marginBottom: 16 }}>
+          <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 8 }}>Dia livre</div>
+          <div style={{ fontSize: 12, color: "#9ca3af" }}>Nenhuma atividade agendada</div>
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
+            {completed} de {todayActivities.length} concluído{todayActivities.length > 1 ? "s" : ""}
+          </div>
+          {todayActivities.map((ak, idx) => {
+            const act = ACTIVITY_TYPES[ak];
+            if (!act) return null;
+            const isComplete = act.kind === "workout"
+              ? isWorkoutCompleted(today, act.workoutKey)
+              : isChecked(today, ak);
+
+            return (
+              <div key={idx} style={{
+                background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12,
+                padding: 16, marginBottom: 10, display: "flex", alignItems: "center", gap: 12,
+                borderLeft: `4px solid ${act.color}`,
+                opacity: isComplete ? 0.6 : 1,
+              }}>
+                <ActivityBadge activityKey={ak} size="lg" />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: "#111827", textDecoration: isComplete ? "line-through" : "none" }}>
+                    {act.label}
+                  </div>
+                  {act.kind === "workout" && (
+                    <div style={{ fontSize: 12, color: "#6b7280" }}>
+                      {WORKOUTS[act.workoutKey].subtitle}
+                    </div>
+                  )}
+                </div>
+                {act.kind === "workout" ? (
+                  <button onClick={() => onStartWorkout(act.workoutKey)} style={{
+                    padding: "8px 14px", background: isComplete ? "#f3f4f6" : act.color,
+                    color: isComplete ? "#6b7280" : "#fff", border: "none", borderRadius: 8,
+                    fontSize: 13, fontWeight: 500, cursor: "pointer",
+                  }}>
+                    {isComplete ? "Refazer" : "Iniciar"}
+                  </button>
+                ) : act.kind === "check" ? (
+                  <button onClick={() => handleCheck(ak)} style={{
+                    padding: "8px 14px", background: isComplete ? "#10b981" : "#fff",
+                    color: isComplete ? "#fff" : "#6b7280",
+                    border: isComplete ? "none" : "1px solid #d1d5db", borderRadius: 8,
+                    fontSize: 13, fontWeight: 500, cursor: "pointer",
+                  }}>
+                    {isComplete ? "✓ Feito" : "Marcar"}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+        </>
+      )}
+
+      {/* Bottom nav */}
+      <div style={{
+        position: "fixed", bottom: 0, left: 0, right: 0,
+        background: "#fff", borderTop: "1px solid #e5e7eb",
+        display: "flex", justifyContent: "space-around",
+        padding: "8px 0", maxWidth: 420, margin: "0 auto",
+      }}>
+        <NavBtn label="Hoje" active />
+        <NavBtn label="Calendário" onClick={onOpenCalendar} />
+        <NavBtn label="Config" onClick={onOpenConfig} />
+        <NavBtn label="Histórico" onClick={onOpenHistory} />
       </div>
     </div>
   );
 }
 
-// ─── SCREENS ────────────────────────────────────────────────
-function Home({ onStart, onHistory }) {
-  const streak = getStreak();
-  const allW = getAllWeighted();
-  const recentPRs = allW.filter(ex => {
-    const h = getHist(ex.id);
-    if (h.length < 2) return false;
-    const pr = getPR(ex.id);
-    const daysSince = (Date.now() - new Date(pr.date)) / 86400000;
-    return daysSince < 14;
-  });
+function NavBtn({ label, active, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      flex: 1, padding: "8px 4px", background: "none", border: "none",
+      cursor: "pointer", fontSize: 11, fontWeight: active ? 600 : 500,
+      color: active ? "#0d9488" : "#6b7280",
+    }}>{label}</button>
+  );
+}
+
+/* ═══════════ CALENDAR SCREEN ═══════════ */
+function CalendarScreen({ onBack, onStartWorkout }) {
+  const [weekOffset, setWeekOffset] = useState(0);
+  const [, forceUpdate] = useState({});
+  const weekDates = getWeekDates(weekOffset);
+  const schedule = loadSchedule();
 
   return (
-    <div style={{ padding: "24px 16px", maxWidth: 420, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 22, fontWeight: 600, margin: "0 0 4px" }}>Treino Funcional</h1>
-      <p style={{ fontSize: 13, color: "#6b7280", margin: "0 0 24px" }}>Segunda Força + Musculação</p>
+    <div style={{ padding: "16px", maxWidth: 420, margin: "0 auto", paddingBottom: 24 }}>
+      <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#6b7280", padding: 4, marginBottom: 12 }}>← Voltar</button>
+      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 16px" }}>Calendário</h2>
 
-      {streak > 0 && (
-        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "12px 14px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <span style={{ fontSize: 13, color: "#166534" }}>{streak} {streak === 1 ? "semana" : "semanas"} consecutivas</span>
-          <span style={{ fontSize: 18 }}>{'🔥'.repeat(Math.min(streak, 5))}</span>
-        </div>
-      )}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <button onClick={() => setWeekOffset(weekOffset - 1)} style={{ background: "#f3f4f6", border: "none", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>← Anterior</button>
+        <span style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>
+          {weekOffset === 0 ? "Esta semana" : weekOffset === -1 ? "Semana passada" : weekOffset === 1 ? "Próxima semana" : `${Math.abs(weekOffset)} semanas ${weekOffset < 0 ? "atrás" : "à frente"}`}
+        </span>
+        <button onClick={() => setWeekOffset(weekOffset + 1)} style={{ background: "#f3f4f6", border: "none", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Próxima →</button>
+      </div>
 
-      {recentPRs.length > 0 && (
-        <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "12px 14px", marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: "#92400e", marginBottom: 6 }}>PRs recentes</div>
-          {recentPRs.slice(0, 3).map(ex => {
-            const pr = getPR(ex.id);
-            return (
-              <div key={ex.id} style={{ fontSize: 12, color: "#78350f", marginBottom: 2 }}>
-                {ex.name}: {pr.weight}kg
+      {weekDates.map((d, idx) => {
+        const dayIdx = d.getDay();
+        const activities = schedule[dayIdx] || [];
+        const isToday = getDateKey(d) === getDateKey(new Date());
+
+        return (
+          <div key={idx} style={{
+            padding: "12px 14px", marginBottom: 8,
+            background: isToday ? "#f0fdfa" : "#fff",
+            border: isToday ? "1px solid #99f6e4" : "1px solid #e5e7eb",
+            borderRadius: 10,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: activities.length > 0 ? 8 : 0 }}>
+              <div>
+                <span style={{ fontSize: 11, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  {DAYS_FULL[dayIdx]}
+                </span>
+                <span style={{ fontSize: 13, color: "#374151", fontWeight: 500, marginLeft: 8 }}>
+                  {d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                </span>
+                {isToday && <span style={{ fontSize: 10, color: "#0d9488", marginLeft: 8, fontWeight: 600 }}>HOJE</span>}
               </div>
-            );
-          })}
-        </div>
-      )}
-
-      {Object.entries(WORKOUTS).map(([k, w]) => (
-        <button key={k} onClick={() => onStart(k)} style={{
-          display: "block", width: "100%", padding: "20px 16px", marginBottom: 12,
-          background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12,
-          cursor: "pointer", textAlign: "left", borderLeft: `4px solid ${w.color}`, boxSizing: "border-box",
-        }}>
-          <div style={{ fontSize: 16, fontWeight: 600 }}>{w.name}</div>
-          <div style={{ fontSize: 13, color: "#6b7280", marginTop: 2 }}>{w.subtitle}</div>
-          <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 4 }}>
-            {w.sections.reduce((a, s) => a + s.exercises.length, 0)} exercícios
+            </div>
+            {activities.length === 0 ? (
+              <div style={{ fontSize: 12, color: "#9ca3af" }}>Descanso</div>
+            ) : (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {activities.map((ak, i) => {
+                  const act = ACTIVITY_TYPES[ak];
+                  if (!act) return null;
+                  const isComplete = act.kind === "workout"
+                    ? isWorkoutCompleted(d, act.workoutKey)
+                    : isChecked(d, ak);
+                  return (
+                    <div key={i} style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      background: isComplete ? "#f0fdf4" : "#f9fafb",
+                      padding: "4px 8px 4px 4px", borderRadius: 6,
+                      border: isComplete ? "1px solid #bbf7d0" : "1px solid #e5e7eb",
+                    }}>
+                      <ActivityBadge activityKey={ak} size="sm" />
+                      <span style={{ fontSize: 12, color: "#374151" }}>{act.label}</span>
+                      {isComplete && <span style={{ fontSize: 11, color: "#10b981", marginLeft: 2 }}>✓</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </button>
-      ))}
+        );
+      })}
+    </div>
+  );
+}
 
-      <button onClick={onHistory} style={{
-        display: "block", width: "100%", padding: "16px", marginTop: 20,
-        background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 12,
-        cursor: "pointer", fontSize: 14, color: "#374151", fontWeight: 500,
+/* ═══════════ CONFIG SCREEN ═══════════ */
+function ConfigScreen({ onBack }) {
+  const [schedule, setSchedule] = useState(loadSchedule());
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  const save = (newSchedule) => {
+    setSchedule(newSchedule);
+    saveSchedule(newSchedule);
+  };
+
+  const toggleActivity = (dayIdx, activityKey) => {
+    const newSchedule = { ...schedule };
+    const current = newSchedule[dayIdx] || [];
+    if (current.includes(activityKey)) {
+      newSchedule[dayIdx] = current.filter(a => a !== activityKey);
+    } else {
+      newSchedule[dayIdx] = [...current, activityKey];
+    }
+    save(newSchedule);
+  };
+
+  const resetToDefault = () => {
+    if (confirm("Restaurar agenda padrão? As configurações atuais serão perdidas.")) {
+      const def = getDefaultSchedule();
+      save(def);
+    }
+  };
+
+  return (
+    <div style={{ padding: "16px", maxWidth: 420, margin: "0 auto", paddingBottom: 24 }}>
+      <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#6b7280", padding: 4, marginBottom: 12 }}>← Voltar</button>
+      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 4px" }}>Configurar semana</h2>
+      <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 20px" }}>Toque pra adicionar/remover atividades</p>
+
+      {DAYS_FULL.map((dayName, dayIdx) => {
+        const activities = schedule[dayIdx] || [];
+        const isExpanded = selectedDay === dayIdx;
+
+        return (
+          <div key={dayIdx} style={{
+            background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10,
+            marginBottom: 8, overflow: "hidden",
+          }}>
+            <button onClick={() => setSelectedDay(isExpanded ? null : dayIdx)} style={{
+              width: "100%", padding: "12px 14px", background: "none",
+              border: "none", cursor: "pointer", textAlign: "left",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <div>
+                <span style={{ fontSize: 14, fontWeight: 500, color: "#111827" }}>{dayName}</span>
+                {activities.length > 0 && (
+                  <span style={{ fontSize: 11, color: "#6b7280", marginLeft: 8 }}>
+                    ({activities.length} {activities.length === 1 ? "atividade" : "atividades"})
+                  </span>
+                )}
+              </div>
+              <span style={{ fontSize: 12, color: "#9ca3af" }}>{isExpanded ? "↑" : "↓"}</span>
+            </button>
+
+            {!isExpanded && activities.length > 0 && (
+              <div style={{ padding: "0 14px 12px", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {activities.map((ak, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <ActivityBadge activityKey={ak} size="sm" />
+                    <span style={{ fontSize: 11, color: "#6b7280" }}>{ACTIVITY_TYPES[ak].label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {isExpanded && (
+              <div style={{ padding: "8px 14px 14px", borderTop: "1px solid #f3f4f6" }}>
+                {Object.entries(ACTIVITY_TYPES).filter(([k]) => k !== "descanso").map(([ak, act]) => {
+                  const selected = activities.includes(ak);
+                  return (
+                    <button key={ak} onClick={() => toggleActivity(dayIdx, ak)} style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      width: "100%", padding: "8px 10px", marginBottom: 4,
+                      background: selected ? `${act.color}11` : "#fff",
+                      border: selected ? `1px solid ${act.color}66` : "1px solid #e5e7eb",
+                      borderRadius: 8, cursor: "pointer", textAlign: "left",
+                    }}>
+                      <ActivityBadge activityKey={ak} size="sm" />
+                      <span style={{ fontSize: 13, color: "#374151", flex: 1 }}>{act.label}</span>
+                      {selected && <span style={{ fontSize: 14, color: act.color }}>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <button onClick={resetToDefault} style={{
+        display: "block", width: "100%", padding: "12px", marginTop: 16,
+        background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10,
+        cursor: "pointer", fontSize: 13, color: "#6b7280",
       }}>
-        Histórico e Evolução
+        Restaurar agenda padrão
       </button>
     </div>
   );
 }
 
-function Workout({ wk, onFinish, onBack }) {
+/* ═══════════ WORKOUT SCREEN (existing) ═══════════ */
+function WorkoutScreen({ wk, onFinish, onBack }) {
   const exercises = useMemo(() => getAllExercises(wk), [wk]);
   const workout = WORKOUTS[wk];
   const [idx, setIdx] = useState(0);
@@ -266,6 +573,7 @@ function Workout({ wk, onFinish, onBack }) {
   const adjSug = sug && ch >= 3 && last?.effort === "pesado"
     ? { weight: sug.weight + (ex.compound ? 2.5 : 1), reason: "3x pesado — tentar subir" } : sug;
   const entry = entries[ex.id] || { weight: "", reps: "", effort: "" };
+
   const upd = (f, v) => {
     setEntries(p => ({ ...p, [ex.id]: { ...p[ex.id], [f]: v } }));
     if (f === "weight" && v && isNewPR(ex.id, v)) setNewPR(true);
@@ -274,7 +582,7 @@ function Workout({ wk, onFinish, onBack }) {
   const secIdx = exercises.filter((e, i) => i <= idx && e.section === ex.section).length;
   const secTot = exercises.filter(e => e.section === ex.section).length;
 
-  const nav = (dir) => { setShowDesc(false); setNewPR(false); setIdx(idx + dir); };
+  const nav = dir => { setShowDesc(false); setNewPR(false); setIdx(idx + dir); };
   const finish = () => {
     Object.entries(entries).forEach(([id, e]) => { if (e.weight || e.reps || e.effort) saveEntry(id, e); });
     onFinish(entries);
@@ -284,11 +592,11 @@ function Workout({ wk, onFinish, onBack }) {
     <div style={{ padding: "16px", maxWidth: 420, margin: "0 auto", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#6b7280" }}>← Voltar</button>
-        <span style={{ fontSize: 13, color: "#9ca3af" }}>{idx + 1}/{exercises.length}</span>
+        <span style={{ fontSize: 13, color: "#9ca3af" }}>{idx+1}/{exercises.length}</span>
       </div>
 
       <div style={{ height: 3, background: "#e5e7eb", borderRadius: 2, marginBottom: 16 }}>
-        <div style={{ height: 3, background: workout.color, borderRadius: 2, width: `${((idx + 1) / exercises.length) * 100}%`, transition: "width 0.3s" }} />
+        <div style={{ height: 3, background: workout.color, borderRadius: 2, width: `${((idx+1)/exercises.length)*100}%`, transition: "width 0.3s" }} />
       </div>
 
       <div style={{ marginBottom: 12 }}>
@@ -304,9 +612,7 @@ function Workout({ wk, onFinish, onBack }) {
       <button onClick={() => setShowDesc(!showDesc)} style={{
         background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px",
         cursor: "pointer", fontSize: 12, color: "#374151", width: "100%", textAlign: "left", marginBottom: 12, boxSizing: "border-box",
-      }}>
-        {showDesc ? "Esconder ↑" : "Como executar ↓"}
-      </button>
+      }}>{showDesc ? "Esconder ↑" : "Como executar ↓"}</button>
       {showDesc && <div style={{ background: "#f9fafb", borderRadius: 8, padding: 12, fontSize: 13, color: "#374151", marginBottom: 12, lineHeight: 1.5 }}>{ex.desc}</div>}
 
       {last && (
@@ -325,7 +631,7 @@ function Workout({ wk, onFinish, onBack }) {
 
       {newPR && !ex.noWeight && (
         <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "8px 12px", marginBottom: 12, fontSize: 13, fontWeight: 600, color: "#92400e", textAlign: "center" }}>
-          Novo recorde de carga nesse exercício!
+          Novo recorde!
         </div>
       )}
 
@@ -337,13 +643,13 @@ function Workout({ wk, onFinish, onBack }) {
                 <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>Peso (kg)</label>
                 <input type="number" inputMode="decimal" value={entry.weight} onChange={e => upd("weight", e.target.value)}
                   placeholder={adjSug ? String(adjSug.weight) : "—"}
-                  style={{ width: "100%", padding: 12, fontSize: 18, fontWeight: 600, border: "1px solid #d1d5db", borderRadius: 8, textAlign: "center", boxSizing: "border-box", outline: "none" }} />
+                  style={{ width: "100%", padding: 12, fontSize: 18, fontWeight: 600, border: "1px solid #d1d5db", borderRadius: 8, textAlign: "center", boxSizing: "border-box", outline: "none" }}/>
               </div>
               <div>
-                <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>Reps feitas</label>
+                <label style={{ fontSize: 12, color: "#6b7280", display: "block", marginBottom: 4 }}>Reps</label>
                 <input type="number" inputMode="numeric" value={entry.reps} onChange={e => upd("reps", e.target.value)}
                   placeholder={ex.reps.split(" ")[0]}
-                  style={{ width: "100%", padding: 12, fontSize: 18, fontWeight: 600, border: "1px solid #d1d5db", borderRadius: 8, textAlign: "center", boxSizing: "border-box", outline: "none" }} />
+                  style={{ width: "100%", padding: 12, fontSize: 18, fontWeight: 600, border: "1px solid #d1d5db", borderRadius: 8, textAlign: "center", boxSizing: "border-box", outline: "none" }}/>
               </div>
             </div>
             <div style={{ marginBottom: 16 }}>
@@ -360,7 +666,6 @@ function Workout({ wk, onFinish, onBack }) {
                   </button>
                 ))}
               </div>
-              {entry.effort && <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 4, textAlign: "center" }}>{EFFORT_OPTS.find(e => e.value === entry.effort)?.hint}</p>}
             </div>
           </>
         ) : (
@@ -391,12 +696,12 @@ function Workout({ wk, onFinish, onBack }) {
   );
 }
 
-function Summary({ wk, entries, onBack }) {
+function SummaryScreen({ wk, entries, onBack }) {
   const workout = WORKOUTS[wk];
   const exercises = getAllExercises(wk);
   const filled = exercises.filter(ex => entries[ex.id] && (entries[ex.id].weight || entries[ex.id].reps));
   const prs = filled.filter(ex => entries[ex.id].weight && isNewPR(ex.id, entries[ex.id].weight));
-  const totalVol = filled.reduce((sum, ex) => sum + (parseFloat(entries[ex.id].weight) || 0) * (parseFloat(entries[ex.id].reps) || 0), 0);
+  const totalVol = filled.reduce((s, ex) => s + (parseFloat(entries[ex.id].weight)||0) * (parseFloat(entries[ex.id].reps)||0), 0);
 
   return (
     <div style={{ padding: "24px 16px", maxWidth: 420, margin: "0 auto" }}>
@@ -433,7 +738,7 @@ function Summary({ wk, entries, onBack }) {
         return (
           <div key={ex.id} style={{ padding: "10px 0", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between" }}>
             <span style={{ fontSize: 13 }}>{ex.name}</span>
-            <div style={{ textAlign: "right" }}>
+            <div>
               <span style={{ fontSize: 13, fontWeight: 600 }}>{e.weight}kg × {e.reps}</span>
               {eff && <span style={{ fontSize: 11, color: eff.color, marginLeft: 8 }}>{eff.label}</span>}
             </div>
@@ -444,12 +749,13 @@ function Summary({ wk, entries, onBack }) {
       <button onClick={onBack} style={{
         display: "block", width: "100%", padding: 14, marginTop: 32, background: "#111827",
         border: "none", borderRadius: 10, color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer",
-      }}>Voltar ao início</button>
+      }}>Voltar</button>
     </div>
   );
 }
 
-function History({ onBack }) {
+/* ═══════════ HISTORY SCREEN (simplified) ═══════════ */
+function HistoryScreen({ onBack }) {
   const [sel, setSel] = useState(null);
   const allW = useMemo(() => {
     const l = [];
@@ -459,62 +765,38 @@ function History({ onBack }) {
     return l;
   }, []);
 
-  // Dashboard
   const data = load();
   const allEntries = [];
   Object.entries(data).forEach(([id, arr]) => arr.forEach(e => allEntries.push({ ...e, id })));
   const thisWeek = getWeekKey(new Date());
-  const lastWeek = getWeekKey(new Date(Date.now() - 7 * 86400000));
-  const thisWeekEntries = allEntries.filter(e => getWeekKey(e.date) === thisWeek);
-  const lastWeekEntries = allEntries.filter(e => getWeekKey(e.date) === lastWeek);
-  const thisVol = thisWeekEntries.reduce((s, e) => s + (parseFloat(e.weight) || 0) * (parseFloat(e.reps) || 0), 0);
-  const lastVol = lastWeekEntries.reduce((s, e) => s + (parseFloat(e.weight) || 0) * (parseFloat(e.reps) || 0), 0);
+  const lastWeek = getWeekKey(new Date(Date.now() - 7*86400000));
+  const thisVol = allEntries.filter(e => getWeekKey(e.date) === thisWeek).reduce((s,e) => s + (parseFloat(e.weight)||0)*(parseFloat(e.reps)||0), 0);
+  const lastVol = allEntries.filter(e => getWeekKey(e.date) === lastWeek).reduce((s,e) => s + (parseFloat(e.weight)||0)*(parseFloat(e.reps)||0), 0);
   const volDiff = lastVol > 0 ? ((thisVol - lastVol) / lastVol * 100) : 0;
   const streak = getStreak();
 
-  // Weekly volume chart
-  const weekMap = {};
-  allEntries.forEach(e => {
-    const wk = getWeekKey(e.date);
-    if (!weekMap[wk]) weekMap[wk] = 0;
-    weekMap[wk] += (parseFloat(e.weight) || 0) * (parseFloat(e.reps) || 0);
-  });
-  const weeklyData = Object.entries(weekMap).sort((a, b) => a[0].localeCompare(b[0])).slice(-8).map(([wk, vol]) => ({ date: wk, volume: Math.round(vol) }));
-
   if (sel) {
     const hist = getHist(sel.id);
-    const withW = hist.filter(h => h.weight);
     const pr = getPR(sel.id);
-    const volData = withW.slice(0, 20).reverse().map(h => ({ ...h, volume: Math.round((parseFloat(h.weight) || 0) * (parseFloat(h.reps) || 0)) }));
-
     return (
       <div style={{ padding: "16px", maxWidth: 420, margin: "0 auto" }}>
         <button onClick={() => setSel(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#6b7280", marginBottom: 16 }}>← Voltar</button>
         <h2 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>{sel.name}</h2>
-        <p style={{ fontSize: 12, color: sel.color, margin: "0 0 16px" }}>{sel.wName}</p>
-
+        <p style={{ fontSize: 12, color: sel.color, margin: "0 0 20px" }}>{sel.wName}</p>
         {pr && (
-          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 12px", marginBottom: 16, display: "flex", justifyContent: "space-between" }}>
+          <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 12px", marginBottom: 16 }}>
             <span style={{ fontSize: 13, color: "#92400e", fontWeight: 600 }}>PR: {pr.weight}kg</span>
-            <span style={{ fontSize: 11, color: "#b45309" }}>{new Date(pr.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })}</span>
           </div>
         )}
-
-        {withW.length >= 2 && <Chart data={withW.slice(0, 20).reverse()} label="Evolução de carga (kg)" color={sel.color} valueKey="weight" formatter={v => `${v}kg`} />}
-        {volData.length >= 2 && <Chart data={volData} label="Volume (peso × reps)" color="#6366f1" valueKey="volume" formatter={v => `${v}`} />}
-
-        <h3 style={{ fontSize: 14, fontWeight: 600, margin: "20px 0 8px" }}>Sessões</h3>
         {hist.length === 0 ? <p style={{ fontSize: 13, color: "#9ca3af" }}>Nenhum registro</p> :
           hist.slice(0, 20).map((h, i) => {
             const eff = EFFORT_OPTS.find(o => o.value === h.effort);
-            const isPR = pr && h.weight === pr.weight && h.date === pr.date;
             return (
-              <div key={i} style={{ padding: "10px 0", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div key={i} style={{ padding: "10px 0", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                  {new Date(h.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+                </span>
                 <div>
-                  <span style={{ fontSize: 12, color: "#9ca3af" }}>{new Date(h.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })}</span>
-                  {isPR && <span style={{ fontSize: 10, color: "#f59e0b", marginLeft: 6, fontWeight: 600 }}>PR</span>}
-                </div>
-                <div style={{ textAlign: "right" }}>
                   <span style={{ fontSize: 14, fontWeight: 600 }}>{h.weight ? `${h.weight}kg` : "—"} × {h.reps || "—"}</span>
                   {eff && <span style={{ fontSize: 11, color: eff.color, marginLeft: 8 }}>{eff.label}</span>}
                 </div>
@@ -529,57 +811,28 @@ function History({ onBack }) {
   return (
     <div style={{ padding: "16px", maxWidth: 420, margin: "0 auto" }}>
       <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#6b7280", marginBottom: 16 }}>← Voltar</button>
-      <h2 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 20px" }}>Histórico e Evolução</h2>
-
-      {/* Dashboard */}
+      <h2 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 20px" }}>Histórico</h2>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 20 }}>
         <div style={{ background: "#f9fafb", borderRadius: 10, padding: "12px 10px", textAlign: "center" }}>
-          <div style={{ fontSize: 10, color: "#6b7280" }}>Semana atual</div>
+          <div style={{ fontSize: 10, color: "#6b7280" }}>Semana</div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>{Math.round(thisVol).toLocaleString()}</div>
-          <div style={{ fontSize: 10, color: "#9ca3af" }}>kg volume</div>
         </div>
         <div style={{ background: "#f9fafb", borderRadius: 10, padding: "12px 10px", textAlign: "center" }}>
           <div style={{ fontSize: 10, color: "#6b7280" }}>vs anterior</div>
           <div style={{ fontSize: 16, fontWeight: 600, color: volDiff > 0 ? "#059669" : volDiff < 0 ? "#dc2626" : "#6b7280" }}>
             {volDiff > 0 ? "+" : ""}{Math.round(volDiff)}%
           </div>
-          <div style={{ fontSize: 10, color: "#9ca3af" }}>variação</div>
         </div>
         <div style={{ background: "#f9fafb", borderRadius: 10, padding: "12px 10px", textAlign: "center" }}>
-          <div style={{ fontSize: 10, color: "#6b7280" }}>Sequência</div>
+          <div style={{ fontSize: 10, color: "#6b7280" }}>Streak</div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>{streak}</div>
-          <div style={{ fontSize: 10, color: "#9ca3af" }}>semanas</div>
         </div>
       </div>
-
-      {/* Weekly volume chart */}
-      {weeklyData.length >= 2 && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 4 }}>Volume semanal</div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 80, background: "#f9fafb", borderRadius: 8, padding: "8px 4px" }}>
-            {weeklyData.map((w, i) => {
-              const maxV = Math.max(...weeklyData.map(x => x.volume));
-              const h = maxV > 0 ? (w.volume / maxV) * 60 : 0;
-              const isCurrent = w.date === thisWeek;
-              return (
-                <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <div style={{ width: "100%", height: h, background: isCurrent ? "#0d9488" : "#d1d5db", borderRadius: 4, minHeight: 2 }} />
-                  <span style={{ fontSize: 8, color: "#9ca3af", marginTop: 2 }}>{getWeekLabel(w.date)}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Exercise list */}
       {Object.entries(WORKOUTS).map(([k, w]) => (
         <div key={k} style={{ marginBottom: 24 }}>
           <h3 style={{ fontSize: 14, fontWeight: 600, color: w.color, margin: "0 0 8px" }}>{w.name}</h3>
           {allW.filter(e => e.wk === k).map(ex => {
             const last = getLast(ex.id);
-            const pr = getPR(ex.id);
-            const isPR = last && pr && last.weight === pr.weight && last.date === pr.date;
             return (
               <button key={ex.id} onClick={() => setSel(ex)} style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -587,10 +840,7 @@ function History({ onBack }) {
                 background: "#fff", border: "1px solid #f3f4f6", borderRadius: 8,
                 cursor: "pointer", textAlign: "left", boxSizing: "border-box",
               }}>
-                <div>
-                  <span style={{ fontSize: 13, color: "#374151" }}>{ex.name}</span>
-                  {isPR && <span style={{ fontSize: 9, color: "#f59e0b", marginLeft: 6, fontWeight: 600 }}>PR</span>}
-                </div>
+                <span style={{ fontSize: 13 }}>{ex.name}</span>
                 <span style={{ fontSize: 12, color: "#9ca3af" }}>{last ? `${last.weight || "—"}kg` : "—"}</span>
               </button>
             );
@@ -601,18 +851,27 @@ function History({ onBack }) {
   );
 }
 
-// ─── APP ────────────────────────────────────────────────────
+/* ═══════════ APP ═══════════ */
 export default function App() {
-  const [screen, setScreen] = useState("home");
+  const [screen, setScreen] = useState("today");
   const [wk, setWk] = useState(null);
   const [done, setDone] = useState(null);
 
   return (
     <div style={{ fontFamily: "'SF Pro Text', -apple-system, system-ui, sans-serif", background: "#fff", minHeight: "100vh" }}>
-      {screen === "home" && <Home onStart={k => { setWk(k); setScreen("workout"); }} onHistory={() => setScreen("history")} />}
-      {screen === "workout" && wk && <Workout wk={wk} onBack={() => setScreen("home")} onFinish={e => { setDone(e); setScreen("summary"); }} />}
-      {screen === "summary" && wk && <Summary wk={wk} entries={done || {}} onBack={() => { setWk(null); setDone(null); setScreen("home"); }} />}
-      {screen === "history" && <History onBack={() => setScreen("home")} />}
+      {screen === "today" && (
+        <TodayScreen
+          onStartWorkout={k => { setWk(k); setScreen("workout"); }}
+          onOpenCalendar={() => setScreen("calendar")}
+          onOpenConfig={() => setScreen("config")}
+          onOpenHistory={() => setScreen("history")}
+        />
+      )}
+      {screen === "calendar" && <CalendarScreen onBack={() => setScreen("today")} onStartWorkout={k => { setWk(k); setScreen("workout"); }} />}
+      {screen === "config" && <ConfigScreen onBack={() => setScreen("today")} />}
+      {screen === "workout" && wk && <WorkoutScreen wk={wk} onBack={() => setScreen("today")} onFinish={e => { setDone(e); setScreen("summary"); }} />}
+      {screen === "summary" && wk && <SummaryScreen wk={wk} entries={done || {}} onBack={() => { setWk(null); setDone(null); setScreen("today"); }} />}
+      {screen === "history" && <HistoryScreen onBack={() => setScreen("today")} />}
     </div>
   );
 }
