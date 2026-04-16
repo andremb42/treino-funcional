@@ -163,6 +163,31 @@ function isWorkoutCompleted(date, workoutKey) {
   );
 }
 
+/* Per-day overrides: changes to today's schedule without altering the template */
+const OVERRIDES_KEY = "treino_overrides_v1";
+const loadOverrides = () => { try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY)) || {}; } catch { return {}; } };
+const saveOverrides = o => { try { localStorage.setItem(OVERRIDES_KEY, JSON.stringify(o)); } catch {} };
+
+function getActivitiesForDate(date) {
+  const dateKey = getDateKey(date);
+  const overrides = loadOverrides();
+  if (overrides[dateKey]) return overrides[dateKey];
+  const schedule = loadSchedule();
+  return schedule[date.getDay()] || [];
+}
+
+function setActivitiesForDate(date, activities) {
+  const overrides = loadOverrides();
+  overrides[getDateKey(date)] = activities;
+  saveOverrides(overrides);
+}
+
+function resetActivitiesForDate(date) {
+  const overrides = loadOverrides();
+  delete overrides[getDateKey(date)];
+  saveOverrides(overrides);
+}
+
 /* ═══════════ HELPERS ═══════════ */
 function getAllExercises(k) {
   const l = [];
@@ -261,10 +286,13 @@ function ActivityBadge({ activityKey, size = "md" }) {
 /* ═══════════ TODAY SCREEN ═══════════ */
 function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHistory }) {
   const [, forceUpdate] = useState({});
+  const [openMenu, setOpenMenu] = useState(null); // index of card with open menu
+  const [showAdd, setShowAdd] = useState(false);
   const today = new Date();
-  const dayOfWeek = today.getDay();
   const schedule = loadSchedule();
-  const todayActivities = schedule[dayOfWeek] || [];
+  const suggestedActivities = schedule[today.getDay()] || [];
+  const todayActivities = getActivitiesForDate(today);
+  const isCustomized = JSON.stringify(suggestedActivities) !== JSON.stringify(todayActivities);
   const st = getStreak();
 
   const handleCheck = (activityKey) => {
@@ -272,18 +300,57 @@ function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHisto
     forceUpdate({});
   };
 
+  const replaceActivity = (idx, newKey) => {
+    const next = [...todayActivities];
+    next[idx] = newKey;
+    setActivitiesForDate(today, next);
+    setOpenMenu(null);
+    forceUpdate({});
+  };
+
+  const removeActivity = (idx) => {
+    const next = todayActivities.filter((_, i) => i !== idx);
+    setActivitiesForDate(today, next);
+    setOpenMenu(null);
+    forceUpdate({});
+  };
+
+  const addActivity = (newKey) => {
+    const next = [...todayActivities, newKey];
+    setActivitiesForDate(today, next);
+    setShowAdd(false);
+    forceUpdate({});
+  };
+
+  const resetToSuggestion = () => {
+    resetActivitiesForDate(today);
+    setOpenMenu(null);
+    forceUpdate({});
+  };
+
   const completed = todayActivities.filter(ak => {
     const act = ACTIVITY_TYPES[ak];
+    if (!act) return false;
     if (act.kind === "workout") return isWorkoutCompleted(today, act.workoutKey);
     return isChecked(today, ak);
   }).length;
+
+  const otherActivities = Object.entries(ACTIVITY_TYPES).filter(([k]) => k !== "descanso");
 
   return (
     <div style={{ padding: "24px 16px", maxWidth: 420, margin: "0 auto", paddingBottom: 80 }}>
       <div style={{ fontSize: 11, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
         {today.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
       </div>
-      <h1 style={{ fontSize: 24, fontWeight: 600, margin: "0 0 20px" }}>Hoje</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 16 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>Hoje</h1>
+        {isCustomized && (
+          <button onClick={resetToSuggestion} style={{
+            background: "none", border: "none", cursor: "pointer",
+            fontSize: 11, color: "#0d9488", textDecoration: "underline", padding: 4,
+          }}>Voltar à sugestão</button>
+        )}
+      </div>
 
       {st > 0 && (
         <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "10px 14px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -292,10 +359,16 @@ function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHisto
         </div>
       )}
 
+      {!isCustomized && suggestedActivities.length > 0 && (
+        <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12, fontStyle: "italic" }}>
+          Sugestão do dia — toque em ⋯ pra personalizar
+        </div>
+      )}
+
       {todayActivities.length === 0 ? (
         <div style={{ background: "#f9fafb", borderRadius: 12, padding: 24, textAlign: "center", marginBottom: 16 }}>
           <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 8 }}>Dia livre</div>
-          <div style={{ fontSize: 12, color: "#9ca3af" }}>Nenhuma atividade agendada</div>
+          <div style={{ fontSize: 12, color: "#9ca3af" }}>Nenhuma atividade — toque abaixo pra adicionar</div>
         </div>
       ) : (
         <>
@@ -308,47 +381,123 @@ function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHisto
             const isComplete = act.kind === "workout"
               ? isWorkoutCompleted(today, act.workoutKey)
               : isChecked(today, ak);
+            const menuOpen = openMenu === idx;
 
             return (
-              <div key={idx} style={{
-                background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12,
-                padding: 16, marginBottom: 10, display: "flex", alignItems: "center", gap: 12,
-                borderLeft: `4px solid ${act.color}`,
-                opacity: isComplete ? 0.6 : 1,
-              }}>
-                <ActivityBadge activityKey={ak} size="lg" />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, color: "#111827", textDecoration: isComplete ? "line-through" : "none" }}>
-                    {act.label}
-                  </div>
-                  {act.kind === "workout" && (
-                    <div style={{ fontSize: 12, color: "#6b7280" }}>
-                      {WORKOUTS[act.workoutKey].subtitle}
+              <div key={idx} style={{ position: "relative", marginBottom: 10 }}>
+                <div style={{
+                  background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12,
+                  padding: 14, display: "flex", alignItems: "center", gap: 10,
+                  borderLeft: `4px solid ${act.color}`,
+                  opacity: isComplete ? 0.6 : 1,
+                }}>
+                  <ActivityBadge activityKey={ak} size="lg" />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: "#111827", textDecoration: isComplete ? "line-through" : "none" }}>
+                      {act.label}
                     </div>
-                  )}
+                    {act.kind === "workout" && (
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>
+                        {WORKOUTS[act.workoutKey].subtitle}
+                      </div>
+                    )}
+                  </div>
+                  {act.kind === "workout" ? (
+                    <button onClick={() => onStartWorkout(act.workoutKey)} style={{
+                      padding: "7px 12px", background: isComplete ? "#f3f4f6" : act.color,
+                      color: isComplete ? "#6b7280" : "#fff", border: "none", borderRadius: 8,
+                      fontSize: 13, fontWeight: 500, cursor: "pointer",
+                    }}>
+                      {isComplete ? "Refazer" : "Iniciar"}
+                    </button>
+                  ) : act.kind === "check" ? (
+                    <button onClick={() => handleCheck(ak)} style={{
+                      padding: "7px 12px", background: isComplete ? "#10b981" : "#fff",
+                      color: isComplete ? "#fff" : "#6b7280",
+                      border: isComplete ? "none" : "1px solid #d1d5db", borderRadius: 8,
+                      fontSize: 13, fontWeight: 500, cursor: "pointer",
+                    }}>
+                      {isComplete ? "✓ Feito" : "Marcar"}
+                    </button>
+                  ) : null}
+                  <button
+                    onClick={() => setOpenMenu(menuOpen ? null : idx)}
+                    style={{
+                      padding: "6px 8px", background: menuOpen ? "#f3f4f6" : "transparent",
+                      border: "none", cursor: "pointer", fontSize: 16, color: "#9ca3af",
+                      borderRadius: 6,
+                    }}
+                    aria-label="Opções"
+                  >⋯</button>
                 </div>
-                {act.kind === "workout" ? (
-                  <button onClick={() => onStartWorkout(act.workoutKey)} style={{
-                    padding: "8px 14px", background: isComplete ? "#f3f4f6" : act.color,
-                    color: isComplete ? "#6b7280" : "#fff", border: "none", borderRadius: 8,
-                    fontSize: 13, fontWeight: 500, cursor: "pointer",
+
+                {menuOpen && (
+                  <div style={{
+                    position: "absolute", top: "100%", right: 0, marginTop: 4,
+                    background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10,
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                    zIndex: 10, minWidth: 220, padding: 6,
                   }}>
-                    {isComplete ? "Refazer" : "Iniciar"}
-                  </button>
-                ) : act.kind === "check" ? (
-                  <button onClick={() => handleCheck(ak)} style={{
-                    padding: "8px 14px", background: isComplete ? "#10b981" : "#fff",
-                    color: isComplete ? "#fff" : "#6b7280",
-                    border: isComplete ? "none" : "1px solid #d1d5db", borderRadius: 8,
-                    fontSize: 13, fontWeight: 500, cursor: "pointer",
-                  }}>
-                    {isComplete ? "✓ Feito" : "Marcar"}
-                  </button>
-                ) : null}
+                    <div style={{ fontSize: 10, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", padding: "6px 10px 4px" }}>
+                      Trocar por
+                    </div>
+                    {otherActivities.filter(([k]) => k !== ak).map(([k, a]) => (
+                      <button key={k} onClick={() => replaceActivity(idx, k)} style={{
+                        display: "flex", alignItems: "center", gap: 10,
+                        width: "100%", padding: "8px 10px", background: "none",
+                        border: "none", cursor: "pointer", textAlign: "left",
+                        borderRadius: 6,
+                      }}>
+                        <ActivityBadge activityKey={k} size="sm" />
+                        <span style={{ fontSize: 13, color: "#374151" }}>{a.label}</span>
+                      </button>
+                    ))}
+                    <div style={{ borderTop: "1px solid #f3f4f6", marginTop: 4, paddingTop: 4 }}>
+                      <button onClick={() => removeActivity(idx)} style={{
+                        display: "block", width: "100%", padding: "8px 10px",
+                        background: "none", border: "none", cursor: "pointer",
+                        textAlign: "left", fontSize: 13, color: "#dc2626", borderRadius: 6,
+                      }}>
+                        Remover do dia
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
         </>
+      )}
+
+      {/* Add activity button + panel */}
+      {!showAdd ? (
+        <button onClick={() => setShowAdd(true)} style={{
+          display: "block", width: "100%", padding: 12, marginTop: 8,
+          background: "#fff", border: "1px dashed #d1d5db", borderRadius: 10,
+          cursor: "pointer", fontSize: 13, color: "#6b7280", fontWeight: 500,
+        }}>
+          + Adicionar atividade
+        </button>
+      ) : (
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, marginTop: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 6px 8px" }}>
+            <span style={{ fontSize: 12, color: "#6b7280", fontWeight: 500 }}>Escolher atividade</span>
+            <button onClick={() => setShowAdd(false)} style={{
+              background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#9ca3af", padding: 2,
+            }}>×</button>
+          </div>
+          {otherActivities.map(([k, a]) => (
+            <button key={k} onClick={() => addActivity(k)} style={{
+              display: "flex", alignItems: "center", gap: 10,
+              width: "100%", padding: "10px", background: "none",
+              border: "none", cursor: "pointer", textAlign: "left",
+              borderRadius: 6,
+            }}>
+              <ActivityBadge activityKey={k} size="md" />
+              <span style={{ fontSize: 13, color: "#374151" }}>{a.label}</span>
+            </button>
+          ))}
+        </div>
       )}
 
       {/* Bottom nav */}
@@ -399,7 +548,7 @@ function CalendarScreen({ onBack, onStartWorkout }) {
 
       {weekDates.map((d, idx) => {
         const dayIdx = d.getDay();
-        const activities = schedule[dayIdx] || [];
+        const activities = getActivitiesForDate(d);
         const isToday = getDateKey(d) === getDateKey(new Date());
 
         return (
