@@ -1,28 +1,31 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 
-/* ═══════════ WORKOUT DATA ═══════════ */
+/* ═══════════ WORKOUT DATA (com IDs globais para exercícios duplicados) ═══════════ */
+/* Exercícios que aparecem em múltiplos treinos usam o mesmo ID canônico
+   pra que a sugestão de peso e o histórico sejam compartilhados. */
+
 const WORKOUTS = {
   A: {
     name: "Treino A", subtitle: "Empurrar + Puxar + Ombro", color: "#0d9488",
     sections: [
       { name: "Ativação", rest: "30s", exercises: [
-        { id:"a1", name:"Dead Bug", sets:3, reps:"8/lado", noWeight:true, desc:"Deitar de costas, braços e pernas no ar. Descer braço e perna oposta sem mover lombar." },
-        { id:"a2", name:"Rotação ext. ombro", sets:2, reps:"15/lado", noWeight:true, desc:"Elástico, cotovelo colado a 90°. Girar antebraço pra fora. Lento." },
-        { id:"a3", name:"Band Pull Apart", sets:2, reps:"15", noWeight:true, desc:"Elástico à frente, abrir braços até encostar no peito." },
+        { id:"dead_bug", name:"Dead Bug", sets:3, reps:"8/lado", noWeight:true, desc:"Deitar de costas, braços e pernas no ar. Descer braço e perna oposta sem mover lombar." },
+        { id:"rot_ext_ombro", name:"Rotação ext. ombro", sets:2, reps:"15/lado", noWeight:true, desc:"Elástico, cotovelo colado a 90°. Girar antebraço pra fora. Lento." },
+        { id:"band_pull_apart", name:"Band Pull Apart", sets:2, reps:"15", noWeight:true, desc:"Elástico à frente, abrir braços até encostar no peito." },
       ]},
       { name: "Principal", rest: "60-90s", exercises: [
-        { id:"a4", name:"Supino reto hammer", sets:3, reps:"6-4-3 *CS", compound:true, desc:"Cluster set: 8RM. 6 reps, 15s, 4 reps, 15s, 3 reps." },
-        { id:"a5", name:"Remada curvada c/ barra", sets:3, reps:"6 a 8", compound:true, desc:"Tronco a 45°, puxar na direção do umbigo. Lombar neutra." },
-        { id:"a6", name:"Supino inclinado hammer", sets:3, reps:"6-4-3 *CS", compound:true, desc:"Cluster set. Porção superior do peitoral." },
-        { id:"a7", name:"Puxador aberto polia", sets:3, reps:"6-4-3 *CS", compound:true, desc:"Pegada aberta, puxar até peito. Contrair escápulas." },
-        { id:"a8", name:"Elevação lateral halter", sets:3, reps:"8 a 12", compound:false, desc:"Em pé, levantar até linha do ombro. Deltóide lateral." },
-        { id:"a9", name:"Crucifixo inv. máquina", sets:3, reps:"10 a 12", compound:false, desc:"Peck deck invertido. Deltóide posterior." },
-        { id:"a10", name:"Face Pull polia", sets:3, reps:"15", compound:false, desc:"Polia alta, corda. Puxar na direção dos olhos." },
-        { id:"a11", name:"Crucifixo polia", sets:2, reps:"6 a 8", compound:false, desc:"Alternar semanas pra cima/baixo." },
+        { id:"supino_reto_hammer", name:"Supino reto hammer", sets:3, reps:"6-4-3 *CS", compound:true, desc:"Cluster set: 8RM. 6 reps, 15s, 4 reps, 15s, 3 reps." },
+        { id:"remada_curvada_barra", name:"Remada curvada c/ barra", sets:3, reps:"6 a 8", compound:true, desc:"Tronco a 45°, puxar na direção do umbigo. Lombar neutra." },
+        { id:"supino_inclinado_hammer", name:"Supino inclinado hammer", sets:3, reps:"6-4-3 *CS", compound:true, desc:"Cluster set. Porção superior do peitoral." },
+        { id:"puxador_aberto", name:"Puxador aberto polia", sets:3, reps:"6-4-3 *CS", compound:true, desc:"Pegada aberta, puxar até peito. Contrair escápulas." },
+        { id:"elev_lateral_halter", name:"Elevação lateral halter", sets:3, reps:"8 a 12", compound:false, desc:"Em pé, levantar até linha do ombro. Deltóide lateral." },
+        { id:"crucifixo_inv_maquina", name:"Crucifixo inv. máquina", sets:3, reps:"10 a 12", compound:false, desc:"Peck deck invertido. Deltóide posterior." },
+        { id:"face_pull", name:"Face Pull polia", sets:3, reps:"15", compound:false, desc:"Polia alta, corda. Puxar na direção dos olhos." },
+        { id:"crucifixo_polia", name:"Crucifixo polia", sets:2, reps:"6 a 8", compound:false, desc:"Alternar semanas pra cima/baixo." },
       ]},
       { name: "Finalização", rest: "30-45s", exercises: [
-        { id:"a12", name:"Pallof Press polia", sets:2, reps:"10/lado", noWeight:true, desc:"De lado, empurrar mãos pra frente. Anti-rotação de core." },
-        { id:"a13", name:"Hang passivo barra", sets:2, reps:"30s", noWeight:true, desc:"Pendurar relaxado. Descomprime coluna." },
+        { id:"pallof_press", name:"Pallof Press polia", sets:2, reps:"10/lado", noWeight:true, desc:"De lado, empurrar mãos pra frente. Anti-rotação de core." },
+        { id:"hang_passivo", name:"Hang passivo barra", sets:2, reps:"30s", noWeight:true, desc:"Pendurar relaxado. Descomprime coluna." },
       ]},
     ],
   },
@@ -30,23 +33,25 @@ const WORKOUTS = {
     name: "Treino B", subtitle: "Pernas + Core + Ombro", color: "#059669",
     sections: [
       { name: "Ativação", rest: "30s", exercises: [
-        { id:"b1", name:"Glúteo Bridge unilat.", sets:3, reps:"10/lado", noWeight:true, desc:"Uma perna apoiada, outra estendida. Subir quadril." },
-        { id:"b2", name:"Clamshell c/ elástico", sets:2, reps:"15/lado", noWeight:true, desc:"Deitado de lado, abrir joelho de cima. Glúteo médio." },
-        { id:"b3", name:"Mobilidade tornozelo", sets:2, reps:"10/lado", noWeight:true, desc:"Joelho em direção à parede, calcanhar no chão." },
+        { id:"gluteo_bridge_unilat", name:"Glúteo Bridge unilat.", sets:3, reps:"10/lado", noWeight:true, desc:"Uma perna apoiada, outra estendida. Subir quadril." },
+        { id:"clamshell", name:"Clamshell c/ elástico", sets:2, reps:"15/lado", noWeight:true, desc:"Deitado de lado, abrir joelho de cima. Glúteo médio." },
+        { id:"mob_tornozelo", name:"Mobilidade tornozelo", sets:2, reps:"10/lado", noWeight:true, desc:"Joelho em direção à parede, calcanhar no chão. Importante pro Aquiles." },
       ]},
       { name: "Principal", rest: "60-90s", exercises: [
-        { id:"b4", name:"Agachamento livre barra", sets:4, reps:"6 a 8", compound:true, desc:"Barra nas costas, descer abaixo do paralelo." },
-        { id:"b5", name:"Cadeira flexora", sets:3, reps:"6 a 8", compound:false, desc:"Isquiotibiais. Excêntrica lenta (3s)." },
-        { id:"b6", name:"Leg press unilateral", sets:3, reps:"10/lado", compound:true, desc:"Uma perna por vez. Excêntrica controlada." },
-        { id:"b7", name:"Afundo na máquina", sets:3, reps:"8 a 10", compound:true, desc:"Passo longo = glúteo. Passo curto = quadríceps." },
-        { id:"b8", name:"Elevação frontal halter", sets:3, reps:"10 a 12", compound:false, desc:"Levantar à frente até altura do ombro." },
-        { id:"b9", name:"Cadeira adutora", sets:3, reps:"10 a 15", compound:false, desc:"Estabiliza quadril." },
-        { id:"b10", name:"Cadeira abdutora", sets:3, reps:"10 a 15", compound:false, desc:"Complementa glúteo médio." },
-        { id:"b11", name:"Panturrilha em pé", sets:3, reps:"10 a 15", compound:false, desc:"Subir, segurar 1s, descer lento." },
+        { id:"agachamento_livre", name:"Agachamento livre barra", sets:4, reps:"6 a 8", compound:true, desc:"Barra nas costas, descer abaixo do paralelo. Lombar neutra (cuidado L5-S1)." },
+        { id:"hip_thrust", name:"Hip Thrust c/ barra", sets:3, reps:"8 a 10", compound:true, desc:"NOVO. Apoio nas costas no banco, barra no quadril, subir contraindo glúteo. Protege L5-S1." },
+        { id:"cadeira_flexora", name:"Cadeira flexora", sets:3, reps:"6 a 8", compound:false, desc:"Isquiotibiais. Excêntrica lenta (3s)." },
+        { id:"leg_press_unilat", name:"Leg press unilateral", sets:3, reps:"10/lado", compound:true, desc:"Uma perna por vez. Excêntrica controlada." },
+        { id:"afundo_maquina", name:"Afundo na máquina", sets:3, reps:"8 a 10", compound:true, desc:"Passo longo = glúteo. Passo curto = quadríceps." },
+        { id:"elev_frontal_halter", name:"Elevação frontal halter", sets:3, reps:"10 a 12", compound:false, desc:"Levantar à frente até altura do ombro." },
+        { id:"adutora", name:"Cadeira adutora", sets:3, reps:"10 a 15", compound:false, desc:"Estabiliza quadril." },
+        { id:"abdutora", name:"Cadeira abdutora", sets:3, reps:"10 a 15", compound:false, desc:"Complementa glúteo médio." },
+        { id:"heel_drop_excentrico", name:"Heel drop excêntrico", sets:3, reps:"10 (joelho reto + flex)", compound:false, desc:"NOVO. NO CHÃO (não em step). Sobe nas duas pernas, transfere pra direita, desce em 3s. Faz 10 com joelho reto + 10 joelho flex 20°. Tratamento da cicatriz/entesite." },
       ]},
       { name: "Finalização", rest: "30s", exercises: [
-        { id:"b12", name:"Prancha c/ toque no ombro", sets:3, reps:"8/lado", noWeight:true, desc:"Posição de flexão, tocar ombro oposto sem rotacionar." },
-        { id:"b13", name:"90/90 stretch quadril", sets:2, reps:"30s/lado", noWeight:true, desc:"Sentado, pernas a 90°. Rotação do quadril." },
+        { id:"prancha_toque_ombro", name:"Prancha c/ toque no ombro", sets:3, reps:"8/lado", noWeight:true, desc:"Posição de flexão, tocar ombro oposto sem rotacionar." },
+        { id:"foam_roller_panturrilha", name:"Foam roller panturrilha", sets:1, reps:"60-90s/lado", noWeight:true, desc:"NOVO. Pressão moderada no terço médio-distal direito. Mobiliza cicatriz miotendínea." },
+        { id:"stretch_90_90", name:"90/90 stretch quadril", sets:2, reps:"30s/lado", noWeight:true, desc:"Sentado, pernas a 90°. Rotação do quadril." },
       ]},
     ],
   },
@@ -54,22 +59,23 @@ const WORKOUTS = {
     name: "Treino C", subtitle: "Full Body + Braços", color: "#2563eb",
     sections: [
       { name: "Ativação", rest: "30s", exercises: [
-        { id:"c1", name:"Cat-Cow", sets:2, reps:"10", noWeight:true, desc:"4 apoios. Alternar arquear e estender a coluna." },
-        { id:"c2", name:"Inchworm", sets:2, reps:"6", noWeight:true, desc:"Em pé, mãos ao chão, caminhar até prancha e voltar." },
-        { id:"c3", name:"Rotação ext. ombro", sets:2, reps:"12/lado", noWeight:true, desc:"Elástico, prepara manguito pro desenvolvimento." },
+        { id:"cat_cow", name:"Cat-Cow", sets:2, reps:"10", noWeight:true, desc:"4 apoios. Alternar arquear e estender a coluna." },
+        { id:"ext_toracica_foam", name:"Extensão torácica foam roller", sets:1, reps:"10-15", noWeight:true, desc:"NOVO. Foam roller transversal na torácica média, braços cruzados, estender sobre o rolo. Combate cifose da EA." },
+        { id:"rot_ext_ombro", name:"Rotação ext. ombro", sets:2, reps:"12/lado", noWeight:true, desc:"Elástico, prepara manguito pro desenvolvimento." },
       ]},
       { name: "Principal", rest: "60-90s", exercises: [
-        { id:"c4", name:"Stiff c/ barra", sets:3, reps:"6 a 10", compound:true, desc:"Quadril pra trás, barra perto do corpo, lombar neutra." },
-        { id:"c5", name:"Supino reto hammer", sets:3, reps:"6 a 8", compound:true, desc:"Sem cluster set. Volume adicional de peito." },
-        { id:"c6", name:"Desenvolvimento hammer", sets:3, reps:"6 a 8", compound:true, desc:"Press ombro na máquina." },
-        { id:"c7", name:"Remada unilat. halter", sets:3, reps:"8-10/lado", compound:true, desc:"Apoiar mão e joelho no banco, puxar halter." },
-        { id:"c8", name:"Elevação lateral polia", sets:3, reps:"10-12/lado", compound:false, desc:"Polia baixa, mão oposta. Tensão constante." },
-        { id:"c9", name:"Rosca direta polia", sets:3, reps:"6 a 8", compound:false, desc:"Barra reta ou W. Cotovelos fixos." },
-        { id:"c10", name:"Tríceps polia", sets:3, reps:"6 a 8", compound:false, desc:"Corda ou barra. Cotovelos fixos." },
+        { id:"stiff_barra", name:"Stiff c/ barra", sets:3, reps:"6 a 10", compound:true, desc:"Quadril pra trás, barra perto do corpo, lombar neutra. Atenção L5-S1." },
+        { id:"supino_reto_hammer", name:"Supino reto hammer", sets:3, reps:"6 a 8", compound:true, desc:"Sem cluster set. Volume adicional de peito." },
+        { id:"desenvolvimento_hammer", name:"Desenvolvimento hammer", sets:3, reps:"6 a 8", compound:true, desc:"Press ombro na máquina sentado." },
+        { id:"remada_unilat_halter", name:"Remada unilat. halter", sets:3, reps:"8-10/lado", compound:true, desc:"Apoiar mão e joelho no banco, puxar halter." },
+        { id:"elev_lateral_polia", name:"Elevação lateral polia", sets:3, reps:"10-12/lado", compound:false, desc:"Polia baixa, mão oposta. Tensão constante." },
+        { id:"rosca_polia", name:"Rosca direta polia", sets:3, reps:"6 a 8", compound:false, desc:"Barra reta ou W. Cotovelos fixos." },
+        { id:"triceps_polia", name:"Tríceps polia", sets:3, reps:"6 a 8", compound:false, desc:"Corda ou barra. Cotovelos fixos." },
       ]},
       { name: "Finalização", rest: "30s", exercises: [
-        { id:"c11", name:"Prancha frontal", sets:3, reps:"30-45s", noWeight:true, desc:"Antebraços no chão, corpo reto. Glúteo contraído." },
-        { id:"c12", name:"World's Greatest Stretch", sets:2, reps:"5/lado", noWeight:true, desc:"Lunge + rotação torácica. Mobilidade completa." },
+        { id:"prancha_frontal", name:"Prancha frontal", sets:3, reps:"30-45s", noWeight:true, desc:"Antebraços no chão, corpo reto. Glúteo contraído." },
+        { id:"couch_stretch", name:"Couch stretch / Flexor quadril", sets:2, reps:"60s/lado", noWeight:true, desc:"NOVO. Joelho no chão, pé apoiado em banco/parede atrás. Alongamento de psoas. Crítico pra EA." },
+        { id:"world_greatest_stretch", name:"World's Greatest Stretch", sets:2, reps:"5/lado", noWeight:true, desc:"Lunge + rotação torácica. Mobilidade completa." },
       ]},
     ],
   },
@@ -83,7 +89,6 @@ const EFFORT_OPTS = [
   { value:"falha", label:"Falha", hint:"Não completou", color:"#991b1b" },
 ];
 
-/* Activity types */
 const ACTIVITY_TYPES = {
   muscA: { label: "Musculação A", short: "A", color: "#0d9488", kind: "workout", workoutKey: "A" },
   muscB: { label: "Musculação B", short: "B", color: "#059669", kind: "workout", workoutKey: "B" },
@@ -91,16 +96,69 @@ const ACTIVITY_TYPES = {
   corrida: { label: "Corrida", short: "R", color: "#ea580c", kind: "check" },
   yoga: { label: "Yoga", short: "Y", color: "#7c3aed", kind: "check" },
   ativacao: { label: "Ativação", short: "A+", color: "#0891b2", kind: "check" },
+  mcgill: { label: "McGill Big 3", short: "M3", color: "#be185d", kind: "check" },
   descanso: { label: "Descanso", short: "Z", color: "#6b7280", kind: "rest" },
 };
 
-const DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const DAYS_FULL = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
 /* ═══════════ STORAGE ═══════════ */
-const SK = "treino_func_v3";
+const SK = "treino_func_v4"; // bumped from v3
 const SCHEDULE_KEY = "treino_schedule_v1";
 const CHECKS_KEY = "treino_checks_v1";
+const OVERRIDES_KEY = "treino_overrides_v1";
+const MIGRATION_KEY = "treino_migrated_v3_to_v4";
+
+/* Migration: v3 used IDs like a4, c5 (per workout). v4 uses canonical IDs.
+   Mapping below merges historical data of duplicate exercises. */
+const V3_TO_V4_ID_MAP = {
+  // Treino A
+  "a1": "dead_bug", "a2": "rot_ext_ombro", "a3": "band_pull_apart",
+  "a4": "supino_reto_hammer", "a5": "remada_curvada_barra",
+  "a6": "supino_inclinado_hammer", "a7": "puxador_aberto",
+  "a8": "elev_lateral_halter", "a9": "crucifixo_inv_maquina",
+  "a10": "face_pull", "a11": "crucifixo_polia",
+  "a12": "pallof_press", "a13": "hang_passivo",
+  // Treino B
+  "b1": "gluteo_bridge_unilat", "b2": "clamshell", "b3": "mob_tornozelo",
+  "b4": "agachamento_livre", "b5": "cadeira_flexora",
+  "b6": "leg_press_unilat", "b7": "afundo_maquina",
+  "b8": "elev_frontal_halter", "b9": "adutora", "b10": "abdutora",
+  "b11": null, // panturrilha em pé virou heel_drop_excentrico — NÃO migra peso (exercício diferente)
+  "b12": "prancha_toque_ombro", "b13": "stretch_90_90",
+  // Treino C
+  "c1": "cat_cow", "c2": null, // Inchworm removido
+  "c3": "rot_ext_ombro",
+  "c4": "stiff_barra", "c5": "supino_reto_hammer",
+  "c6": "desenvolvimento_hammer", "c7": "remada_unilat_halter",
+  "c8": "elev_lateral_polia", "c9": "rosca_polia", "c10": "triceps_polia",
+  "c11": "prancha_frontal", "c12": "world_greatest_stretch",
+};
+
+function migrateV3ToV4() {
+  if (localStorage.getItem(MIGRATION_KEY)) return;
+  try {
+    const oldKey = "treino_func_v3";
+    const oldData = JSON.parse(localStorage.getItem(oldKey) || "{}");
+    if (Object.keys(oldData).length === 0) {
+      localStorage.setItem(MIGRATION_KEY, "1");
+      return;
+    }
+    const newData = JSON.parse(localStorage.getItem(SK) || "{}");
+    Object.entries(oldData).forEach(([oldId, entries]) => {
+      const newId = V3_TO_V4_ID_MAP[oldId];
+      if (!newId) return; // skip removed/changed exercises
+      if (!newData[newId]) newData[newId] = [];
+      // merge entries, deduplicating by date
+      const existingDates = new Set(newData[newId].map(e => e.date));
+      entries.forEach(e => { if (!existingDates.has(e.date)) newData[newId].push(e); });
+    });
+    localStorage.setItem(SK, JSON.stringify(newData));
+    localStorage.setItem(MIGRATION_KEY, "1");
+  } catch (e) {
+    console.error("Migration failed:", e);
+  }
+}
 
 const load = () => { try { return JSON.parse(localStorage.getItem(SK)) || {}; } catch { return {}; } };
 const save = d => { try { localStorage.setItem(SK, JSON.stringify(d)); } catch {} };
@@ -117,15 +175,18 @@ const saveSchedule = s => { try { localStorage.setItem(SCHEDULE_KEY, JSON.string
 const loadChecks = () => { try { return JSON.parse(localStorage.getItem(CHECKS_KEY)) || {}; } catch { return {}; } };
 const saveChecks = c => { try { localStorage.setItem(CHECKS_KEY, JSON.stringify(c)); } catch {} };
 
+const loadOverrides = () => { try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY)) || {}; } catch { return {}; } };
+const saveOverrides = o => { try { localStorage.setItem(OVERRIDES_KEY, JSON.stringify(o)); } catch {} };
+
 function getDefaultSchedule() {
   return {
-    0: [], // Dom
-    1: ["ativacao", "muscA"],
-    2: ["yoga"],
-    3: ["corrida", "muscB"],
-    4: ["yoga"],
-    5: ["ativacao", "muscC"],
-    6: ["corrida", "yoga"],
+    0: [],
+    1: ["mcgill", "ativacao", "muscA"],
+    2: ["mcgill", "yoga"],
+    3: ["mcgill", "corrida", "muscB"],
+    4: ["mcgill", "yoga"],
+    5: ["mcgill", "ativacao", "muscC"],
+    6: ["mcgill", "corrida", "yoga"],
   };
 }
 
@@ -163,11 +224,6 @@ function isWorkoutCompleted(date, workoutKey) {
   );
 }
 
-/* Per-day overrides: changes to today's schedule without altering the template */
-const OVERRIDES_KEY = "treino_overrides_v1";
-const loadOverrides = () => { try { return JSON.parse(localStorage.getItem(OVERRIDES_KEY)) || {}; } catch { return {}; } };
-const saveOverrides = o => { try { localStorage.setItem(OVERRIDES_KEY, JSON.stringify(o)); } catch {} };
-
 function getActivitiesForDate(date) {
   const dateKey = getDateKey(date);
   const overrides = loadOverrides();
@@ -188,15 +244,63 @@ function resetActivitiesForDate(date) {
   saveOverrides(overrides);
 }
 
+/* ═══════════ EXPORT / IMPORT ═══════════ */
+function exportAllData() {
+  const data = {
+    version: "v4",
+    exportDate: new Date().toISOString(),
+    workoutHistory: load(),
+    schedule: loadSchedule(),
+    checks: loadChecks(),
+    overrides: loadOverrides(),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  const dateStr = new Date().toISOString().split("T")[0];
+  a.download = `treino-backup-${dateStr}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importAllData(file, onComplete) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.workoutHistory) throw new Error("Arquivo inválido");
+
+      if (data.workoutHistory) localStorage.setItem(SK, JSON.stringify(data.workoutHistory));
+      if (data.schedule) localStorage.setItem(SCHEDULE_KEY, JSON.stringify(data.schedule));
+      if (data.checks) localStorage.setItem(CHECKS_KEY, JSON.stringify(data.checks));
+      if (data.overrides) localStorage.setItem(OVERRIDES_KEY, JSON.stringify(data.overrides));
+
+      onComplete(true, "Histórico restaurado!");
+    } catch (err) {
+      onComplete(false, "Erro ao importar: " + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
 /* ═══════════ HELPERS ═══════════ */
 function getAllExercises(k) {
   const l = [];
   WORKOUTS[k].sections.forEach(s => s.exercises.forEach(e => l.push({ ...e, section: s.name, rest: s.rest })));
   return l;
 }
-function getAllWeighted() {
+function getAllWeightedUnique() {
+  const seen = new Set();
   const list = [];
-  Object.values(WORKOUTS).forEach(w => w.sections.forEach(s => s.exercises.forEach(e => { if (!e.noWeight) list.push(e); })));
+  Object.entries(WORKOUTS).forEach(([wk, w]) => {
+    w.sections.forEach(s => s.exercises.forEach(e => {
+      if (!e.noWeight && !seen.has(e.id)) {
+        seen.add(e.id);
+        list.push({ ...e, primaryWk: wk, primaryWName: w.name, primaryColor: w.color });
+      }
+    }));
+  });
   return list;
 }
 function getSuggestion(last, compound) {
@@ -263,6 +367,9 @@ function getWeekDates(offset = 0) {
   return dates;
 }
 
+/* Run migration on app load */
+if (typeof window !== "undefined") migrateV3ToV4();
+
 /* ═══════════ COMPONENTS ═══════════ */
 function ActivityBadge({ activityKey, size = "md" }) {
   const act = ACTIVITY_TYPES[activityKey];
@@ -286,7 +393,7 @@ function ActivityBadge({ activityKey, size = "md" }) {
 /* ═══════════ TODAY SCREEN ═══════════ */
 function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHistory }) {
   const [, forceUpdate] = useState({});
-  const [openMenu, setOpenMenu] = useState(null); // index of card with open menu
+  const [openMenu, setOpenMenu] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const today = new Date();
   const schedule = loadSchedule();
@@ -295,38 +402,11 @@ function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHisto
   const isCustomized = JSON.stringify(suggestedActivities) !== JSON.stringify(todayActivities);
   const st = getStreak();
 
-  const handleCheck = (activityKey) => {
-    toggleCheck(today, activityKey);
-    forceUpdate({});
-  };
-
-  const replaceActivity = (idx, newKey) => {
-    const next = [...todayActivities];
-    next[idx] = newKey;
-    setActivitiesForDate(today, next);
-    setOpenMenu(null);
-    forceUpdate({});
-  };
-
-  const removeActivity = (idx) => {
-    const next = todayActivities.filter((_, i) => i !== idx);
-    setActivitiesForDate(today, next);
-    setOpenMenu(null);
-    forceUpdate({});
-  };
-
-  const addActivity = (newKey) => {
-    const next = [...todayActivities, newKey];
-    setActivitiesForDate(today, next);
-    setShowAdd(false);
-    forceUpdate({});
-  };
-
-  const resetToSuggestion = () => {
-    resetActivitiesForDate(today);
-    setOpenMenu(null);
-    forceUpdate({});
-  };
+  const handleCheck = (activityKey) => { toggleCheck(today, activityKey); forceUpdate({}); };
+  const replaceActivity = (idx, newKey) => { const next = [...todayActivities]; next[idx] = newKey; setActivitiesForDate(today, next); setOpenMenu(null); forceUpdate({}); };
+  const removeActivity = (idx) => { const next = todayActivities.filter((_, i) => i !== idx); setActivitiesForDate(today, next); setOpenMenu(null); forceUpdate({}); };
+  const addActivity = (newKey) => { const next = [...todayActivities, newKey]; setActivitiesForDate(today, next); setShowAdd(false); forceUpdate({}); };
+  const resetToSuggestion = () => { resetActivitiesForDate(today); setOpenMenu(null); forceUpdate({}); };
 
   const completed = todayActivities.filter(ak => {
     const act = ACTIVITY_TYPES[ak];
@@ -368,7 +448,7 @@ function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHisto
       {todayActivities.length === 0 ? (
         <div style={{ background: "#f9fafb", borderRadius: 12, padding: 24, textAlign: "center", marginBottom: 16 }}>
           <div style={{ fontSize: 14, color: "#6b7280", marginBottom: 8 }}>Dia livre</div>
-          <div style={{ fontSize: 12, color: "#9ca3af" }}>Nenhuma atividade — toque abaixo pra adicionar</div>
+          <div style={{ fontSize: 12, color: "#9ca3af" }}>Toque abaixo pra adicionar atividade</div>
         </div>
       ) : (
         <>
@@ -407,28 +487,20 @@ function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHisto
                       padding: "7px 12px", background: isComplete ? "#f3f4f6" : act.color,
                       color: isComplete ? "#6b7280" : "#fff", border: "none", borderRadius: 8,
                       fontSize: 13, fontWeight: 500, cursor: "pointer",
-                    }}>
-                      {isComplete ? "Refazer" : "Iniciar"}
-                    </button>
+                    }}>{isComplete ? "Refazer" : "Iniciar"}</button>
                   ) : act.kind === "check" ? (
                     <button onClick={() => handleCheck(ak)} style={{
                       padding: "7px 12px", background: isComplete ? "#10b981" : "#fff",
                       color: isComplete ? "#fff" : "#6b7280",
                       border: isComplete ? "none" : "1px solid #d1d5db", borderRadius: 8,
                       fontSize: 13, fontWeight: 500, cursor: "pointer",
-                    }}>
-                      {isComplete ? "✓ Feito" : "Marcar"}
-                    </button>
+                    }}>{isComplete ? "✓ Feito" : "Marcar"}</button>
                   ) : null}
-                  <button
-                    onClick={() => setOpenMenu(menuOpen ? null : idx)}
-                    style={{
-                      padding: "6px 8px", background: menuOpen ? "#f3f4f6" : "transparent",
-                      border: "none", cursor: "pointer", fontSize: 16, color: "#9ca3af",
-                      borderRadius: 6,
-                    }}
-                    aria-label="Opções"
-                  >⋯</button>
+                  <button onClick={() => setOpenMenu(menuOpen ? null : idx)} style={{
+                    padding: "6px 8px", background: menuOpen ? "#f3f4f6" : "transparent",
+                    border: "none", cursor: "pointer", fontSize: 16, color: "#9ca3af",
+                    borderRadius: 6,
+                  }}>⋯</button>
                 </div>
 
                 {menuOpen && (
@@ -438,15 +510,12 @@ function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHisto
                     boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
                     zIndex: 10, minWidth: 220, padding: 6,
                   }}>
-                    <div style={{ fontSize: 10, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", padding: "6px 10px 4px" }}>
-                      Trocar por
-                    </div>
+                    <div style={{ fontSize: 10, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em", padding: "6px 10px 4px" }}>Trocar por</div>
                     {otherActivities.filter(([k]) => k !== ak).map(([k, a]) => (
                       <button key={k} onClick={() => replaceActivity(idx, k)} style={{
                         display: "flex", alignItems: "center", gap: 10,
                         width: "100%", padding: "8px 10px", background: "none",
-                        border: "none", cursor: "pointer", textAlign: "left",
-                        borderRadius: 6,
+                        border: "none", cursor: "pointer", textAlign: "left", borderRadius: 6,
                       }}>
                         <ActivityBadge activityKey={k} size="sm" />
                         <span style={{ fontSize: 13, color: "#374151" }}>{a.label}</span>
@@ -457,9 +526,7 @@ function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHisto
                         display: "block", width: "100%", padding: "8px 10px",
                         background: "none", border: "none", cursor: "pointer",
                         textAlign: "left", fontSize: 13, color: "#dc2626", borderRadius: 6,
-                      }}>
-                        Remover do dia
-                      </button>
+                      }}>Remover do dia</button>
                     </div>
                   </div>
                 )}
@@ -469,15 +536,12 @@ function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHisto
         </>
       )}
 
-      {/* Add activity button + panel */}
       {!showAdd ? (
         <button onClick={() => setShowAdd(true)} style={{
           display: "block", width: "100%", padding: 12, marginTop: 8,
           background: "#fff", border: "1px dashed #d1d5db", borderRadius: 10,
           cursor: "pointer", fontSize: 13, color: "#6b7280", fontWeight: 500,
-        }}>
-          + Adicionar atividade
-        </button>
+        }}>+ Adicionar atividade</button>
       ) : (
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 10, marginTop: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 6px 8px" }}>
@@ -490,8 +554,7 @@ function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHisto
             <button key={k} onClick={() => addActivity(k)} style={{
               display: "flex", alignItems: "center", gap: 10,
               width: "100%", padding: "10px", background: "none",
-              border: "none", cursor: "pointer", textAlign: "left",
-              borderRadius: 6,
+              border: "none", cursor: "pointer", textAlign: "left", borderRadius: 6,
             }}>
               <ActivityBadge activityKey={k} size="md" />
               <span style={{ fontSize: 13, color: "#374151" }}>{a.label}</span>
@@ -500,7 +563,6 @@ function TodayScreen({ onStartWorkout, onOpenCalendar, onOpenConfig, onOpenHisto
         </div>
       )}
 
-      {/* Bottom nav */}
       <div style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
         background: "#fff", borderTop: "1px solid #e5e7eb",
@@ -526,12 +588,9 @@ function NavBtn({ label, active, onClick }) {
   );
 }
 
-/* ═══════════ CALENDAR SCREEN ═══════════ */
-function CalendarScreen({ onBack, onStartWorkout }) {
+function CalendarScreen({ onBack }) {
   const [weekOffset, setWeekOffset] = useState(0);
-  const [, forceUpdate] = useState({});
   const weekDates = getWeekDates(weekOffset);
-  const schedule = loadSchedule();
 
   return (
     <div style={{ padding: "16px", maxWidth: 420, margin: "0 auto", paddingBottom: 24 }}>
@@ -541,7 +600,7 @@ function CalendarScreen({ onBack, onStartWorkout }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <button onClick={() => setWeekOffset(weekOffset - 1)} style={{ background: "#f3f4f6", border: "none", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>← Anterior</button>
         <span style={{ fontSize: 13, color: "#374151", fontWeight: 500 }}>
-          {weekOffset === 0 ? "Esta semana" : weekOffset === -1 ? "Semana passada" : weekOffset === 1 ? "Próxima semana" : `${Math.abs(weekOffset)} semanas ${weekOffset < 0 ? "atrás" : "à frente"}`}
+          {weekOffset === 0 ? "Esta semana" : weekOffset === -1 ? "Semana passada" : weekOffset === 1 ? "Próxima semana" : `${Math.abs(weekOffset)} sem ${weekOffset < 0 ? "atrás" : "à frente"}`}
         </span>
         <button onClick={() => setWeekOffset(weekOffset + 1)} style={{ background: "#f3f4f6", border: "none", borderRadius: 6, padding: "6px 12px", cursor: "pointer", fontSize: 12 }}>Próxima →</button>
       </div>
@@ -558,16 +617,12 @@ function CalendarScreen({ onBack, onStartWorkout }) {
             border: isToday ? "1px solid #99f6e4" : "1px solid #e5e7eb",
             borderRadius: 10,
           }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: activities.length > 0 ? 8 : 0 }}>
-              <div>
-                <span style={{ fontSize: 11, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  {DAYS_FULL[dayIdx]}
-                </span>
-                <span style={{ fontSize: 13, color: "#374151", fontWeight: 500, marginLeft: 8 }}>
-                  {d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
-                </span>
-                {isToday && <span style={{ fontSize: 10, color: "#0d9488", marginLeft: 8, fontWeight: 600 }}>HOJE</span>}
-              </div>
+            <div style={{ marginBottom: activities.length > 0 ? 8 : 0 }}>
+              <span style={{ fontSize: 11, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>{DAYS_FULL[dayIdx]}</span>
+              <span style={{ fontSize: 13, color: "#374151", fontWeight: 500, marginLeft: 8 }}>
+                {d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+              </span>
+              {isToday && <span style={{ fontSize: 10, color: "#0d9488", marginLeft: 8, fontWeight: 600 }}>HOJE</span>}
             </div>
             {activities.length === 0 ? (
               <div style={{ fontSize: 12, color: "#9ca3af" }}>Descanso</div>
@@ -601,49 +656,60 @@ function CalendarScreen({ onBack, onStartWorkout }) {
   );
 }
 
-/* ═══════════ CONFIG SCREEN ═══════════ */
 function ConfigScreen({ onBack }) {
   const [schedule, setSchedule] = useState(loadSchedule());
   const [selectedDay, setSelectedDay] = useState(null);
+  const [importStatus, setImportStatus] = useState(null);
 
-  const save = (newSchedule) => {
-    setSchedule(newSchedule);
-    saveSchedule(newSchedule);
-  };
+  const save = (newSchedule) => { setSchedule(newSchedule); saveSchedule(newSchedule); };
 
   const toggleActivity = (dayIdx, activityKey) => {
     const newSchedule = { ...schedule };
     const current = newSchedule[dayIdx] || [];
-    if (current.includes(activityKey)) {
-      newSchedule[dayIdx] = current.filter(a => a !== activityKey);
-    } else {
-      newSchedule[dayIdx] = [...current, activityKey];
-    }
+    if (current.includes(activityKey)) newSchedule[dayIdx] = current.filter(a => a !== activityKey);
+    else newSchedule[dayIdx] = [...current, activityKey];
     save(newSchedule);
   };
 
   const resetToDefault = () => {
-    if (confirm("Restaurar agenda padrão? As configurações atuais serão perdidas.")) {
-      const def = getDefaultSchedule();
-      save(def);
+    if (confirm("Restaurar agenda padrão?")) save(getDefaultSchedule());
+  };
+
+  const handleExport = () => {
+    exportAllData();
+    setImportStatus({ ok: true, msg: "Backup baixado" });
+    setTimeout(() => setImportStatus(null), 3000);
+  };
+
+  const handleImportFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!confirm("Importar substituirá os dados atuais. Continuar?")) {
+      e.target.value = "";
+      return;
     }
+    importAllData(file, (ok, msg) => {
+      setImportStatus({ ok, msg });
+      if (ok) {
+        setTimeout(() => { window.location.reload(); }, 1500);
+      } else {
+        setTimeout(() => setImportStatus(null), 4000);
+      }
+    });
+    e.target.value = "";
   };
 
   return (
     <div style={{ padding: "16px", maxWidth: 420, margin: "0 auto", paddingBottom: 24 }}>
       <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#6b7280", padding: 4, marginBottom: 12 }}>← Voltar</button>
-      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 4px" }}>Configurar semana</h2>
-      <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 20px" }}>Toque pra adicionar/remover atividades</p>
+      <h2 style={{ fontSize: 20, fontWeight: 600, margin: "0 0 4px" }}>Configurar</h2>
+      <p style={{ fontSize: 12, color: "#6b7280", margin: "0 0 20px" }}>Defina sua semana padrão</p>
 
       {DAYS_FULL.map((dayName, dayIdx) => {
         const activities = schedule[dayIdx] || [];
         const isExpanded = selectedDay === dayIdx;
-
         return (
-          <div key={dayIdx} style={{
-            background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10,
-            marginBottom: 8, overflow: "hidden",
-          }}>
+          <div key={dayIdx} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, marginBottom: 8, overflow: "hidden" }}>
             <button onClick={() => setSelectedDay(isExpanded ? null : dayIdx)} style={{
               width: "100%", padding: "12px 14px", background: "none",
               border: "none", cursor: "pointer", textAlign: "left",
@@ -652,14 +718,11 @@ function ConfigScreen({ onBack }) {
               <div>
                 <span style={{ fontSize: 14, fontWeight: 500, color: "#111827" }}>{dayName}</span>
                 {activities.length > 0 && (
-                  <span style={{ fontSize: 11, color: "#6b7280", marginLeft: 8 }}>
-                    ({activities.length} {activities.length === 1 ? "atividade" : "atividades"})
-                  </span>
+                  <span style={{ fontSize: 11, color: "#6b7280", marginLeft: 8 }}>({activities.length})</span>
                 )}
               </div>
               <span style={{ fontSize: 12, color: "#9ca3af" }}>{isExpanded ? "↑" : "↓"}</span>
             </button>
-
             {!isExpanded && activities.length > 0 && (
               <div style={{ padding: "0 14px 12px", display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {activities.map((ak, i) => (
@@ -670,7 +733,6 @@ function ConfigScreen({ onBack }) {
                 ))}
               </div>
             )}
-
             {isExpanded && (
               <div style={{ padding: "8px 14px 14px", borderTop: "1px solid #f3f4f6" }}>
                 {Object.entries(ACTIVITY_TYPES).filter(([k]) => k !== "descanso").map(([ak, act]) => {
@@ -699,14 +761,43 @@ function ConfigScreen({ onBack }) {
         display: "block", width: "100%", padding: "12px", marginTop: 16,
         background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 10,
         cursor: "pointer", fontSize: 13, color: "#6b7280",
-      }}>
-        Restaurar agenda padrão
-      </button>
+      }}>Restaurar agenda padrão</button>
+
+      <div style={{ marginTop: 24, paddingTop: 16, borderTop: "1px solid #e5e7eb" }}>
+        <h3 style={{ fontSize: 14, fontWeight: 600, color: "#374151", marginBottom: 8 }}>Backup de dados</h3>
+        <p style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12 }}>
+          Exporte seu histórico antes de mudar de aparelho ou trocar versão do app.
+        </p>
+
+        <button onClick={handleExport} style={{
+          display: "block", width: "100%", padding: "12px",
+          background: "#0d9488", border: "none", borderRadius: 10, marginBottom: 8,
+          cursor: "pointer", fontSize: 13, color: "#fff", fontWeight: 500,
+        }}>Exportar histórico</button>
+
+        <label style={{
+          display: "block", width: "100%", padding: "12px",
+          background: "#fff", border: "1px solid #d1d5db", borderRadius: 10,
+          cursor: "pointer", fontSize: 13, color: "#374151", fontWeight: 500,
+          textAlign: "center", boxSizing: "border-box",
+        }}>
+          Importar histórico
+          <input type="file" accept=".json,application/json" onChange={handleImportFile} style={{ display: "none" }} />
+        </label>
+
+        {importStatus && (
+          <div style={{
+            marginTop: 12, padding: "10px 12px", borderRadius: 8, fontSize: 12,
+            background: importStatus.ok ? "#f0fdf4" : "#fef2f2",
+            color: importStatus.ok ? "#166534" : "#991b1b",
+            border: `1px solid ${importStatus.ok ? "#bbf7d0" : "#fecaca"}`,
+          }}>{importStatus.msg}</div>
+        )}
+      </div>
     </div>
   );
 }
 
-/* ═══════════ WORKOUT SCREEN (existing) ═══════════ */
 function WorkoutScreen({ wk, onFinish, onBack }) {
   const exercises = useMemo(() => getAllExercises(wk), [wk]);
   const workout = WORKOUTS[wk];
@@ -730,7 +821,6 @@ function WorkoutScreen({ wk, onFinish, onBack }) {
   };
   const secIdx = exercises.filter((e, i) => i <= idx && e.section === ex.section).length;
   const secTot = exercises.filter(e => e.section === ex.section).length;
-
   const nav = dir => { setShowDesc(false); setNewPR(false); setIdx(idx + dir); };
   const finish = () => {
     Object.entries(entries).forEach(([id, e]) => { if (e.weight || e.reps || e.effort) saveEntry(id, e); });
@@ -810,16 +900,14 @@ function WorkoutScreen({ wk, onFinish, onBack }) {
                     border: entry.effort === o.value ? `2px solid ${o.color}` : "1px solid #e5e7eb",
                     background: entry.effort === o.value ? `${o.color}15` : "#fff",
                     color: entry.effort === o.value ? o.color : "#6b7280",
-                  }}>
-                    {o.label}
-                  </button>
+                  }}>{o.label}</button>
                 ))}
               </div>
             </div>
           </>
         ) : (
           <div style={{ background: "#f9fafb", borderRadius: 8, padding: 16, textAlign: "center", color: "#6b7280", fontSize: 13 }}>
-            Exercício de ativação — foco no controle
+            Exercício sem carga — foco no controle
           </div>
         )}
       </div>
@@ -903,16 +991,9 @@ function SummaryScreen({ wk, entries, onBack }) {
   );
 }
 
-/* ═══════════ HISTORY SCREEN (simplified) ═══════════ */
 function HistoryScreen({ onBack }) {
   const [sel, setSel] = useState(null);
-  const allW = useMemo(() => {
-    const l = [];
-    Object.entries(WORKOUTS).forEach(([k, w]) => w.sections.forEach(s => s.exercises.forEach(e => {
-      if (!e.noWeight) l.push({ ...e, wk: k, wName: w.name, color: w.color });
-    })));
-    return l;
-  }, []);
+  const allW = useMemo(() => getAllWeightedUnique(), []);
 
   const data = load();
   const allEntries = [];
@@ -931,14 +1012,14 @@ function HistoryScreen({ onBack }) {
       <div style={{ padding: "16px", maxWidth: 420, margin: "0 auto" }}>
         <button onClick={() => setSel(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#6b7280", marginBottom: 16 }}>← Voltar</button>
         <h2 style={{ fontSize: 18, fontWeight: 600, margin: "0 0 4px" }}>{sel.name}</h2>
-        <p style={{ fontSize: 12, color: sel.color, margin: "0 0 20px" }}>{sel.wName}</p>
+        <p style={{ fontSize: 12, color: sel.primaryColor, margin: "0 0 20px" }}>Histórico unificado entre treinos</p>
         {pr && (
           <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 12px", marginBottom: 16 }}>
             <span style={{ fontSize: 13, color: "#92400e", fontWeight: 600 }}>PR: {pr.weight}kg</span>
           </div>
         )}
         {hist.length === 0 ? <p style={{ fontSize: 13, color: "#9ca3af" }}>Nenhum registro</p> :
-          hist.slice(0, 20).map((h, i) => {
+          hist.slice(0, 30).map((h, i) => {
             const eff = EFFORT_OPTS.find(o => o.value === h.effort);
             return (
               <div key={i} style={{ padding: "10px 0", borderBottom: "1px solid #f3f4f6", display: "flex", justifyContent: "space-between" }}>
@@ -977,30 +1058,27 @@ function HistoryScreen({ onBack }) {
           <div style={{ fontSize: 16, fontWeight: 600 }}>{streak}</div>
         </div>
       </div>
-      {Object.entries(WORKOUTS).map(([k, w]) => (
-        <div key={k} style={{ marginBottom: 24 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: w.color, margin: "0 0 8px" }}>{w.name}</h3>
-          {allW.filter(e => e.wk === k).map(ex => {
-            const last = getLast(ex.id);
-            return (
-              <button key={ex.id} onClick={() => setSel(ex)} style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                width: "100%", padding: "10px 12px", marginBottom: 4,
-                background: "#fff", border: "1px solid #f3f4f6", borderRadius: 8,
-                cursor: "pointer", textAlign: "left", boxSizing: "border-box",
-              }}>
-                <span style={{ fontSize: 13 }}>{ex.name}</span>
-                <span style={{ fontSize: 12, color: "#9ca3af" }}>{last ? `${last.weight || "—"}kg` : "—"}</span>
-              </button>
-            );
-          })}
-        </div>
-      ))}
+      <p style={{ fontSize: 11, color: "#9ca3af", marginBottom: 12, fontStyle: "italic" }}>
+        Exercícios que aparecem em mais de um treino têm histórico unificado
+      </p>
+      {allW.map(ex => {
+        const last = getLast(ex.id);
+        return (
+          <button key={ex.id} onClick={() => setSel(ex)} style={{
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+            width: "100%", padding: "10px 12px", marginBottom: 4,
+            background: "#fff", border: "1px solid #f3f4f6", borderRadius: 8,
+            cursor: "pointer", textAlign: "left", boxSizing: "border-box",
+          }}>
+            <span style={{ fontSize: 13 }}>{ex.name}</span>
+            <span style={{ fontSize: 12, color: "#9ca3af" }}>{last ? `${last.weight || "—"}kg` : "—"}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
 
-/* ═══════════ APP ═══════════ */
 export default function App() {
   const [screen, setScreen] = useState("today");
   const [wk, setWk] = useState(null);
@@ -1016,7 +1094,7 @@ export default function App() {
           onOpenHistory={() => setScreen("history")}
         />
       )}
-      {screen === "calendar" && <CalendarScreen onBack={() => setScreen("today")} onStartWorkout={k => { setWk(k); setScreen("workout"); }} />}
+      {screen === "calendar" && <CalendarScreen onBack={() => setScreen("today")} />}
       {screen === "config" && <ConfigScreen onBack={() => setScreen("today")} />}
       {screen === "workout" && wk && <WorkoutScreen wk={wk} onBack={() => setScreen("today")} onFinish={e => { setDone(e); setScreen("summary"); }} />}
       {screen === "summary" && wk && <SummaryScreen wk={wk} entries={done || {}} onBack={() => { setWk(null); setDone(null); setScreen("today"); }} />}
